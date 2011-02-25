@@ -187,7 +187,11 @@ public class SweetBlue {
 		}
 		return null;
 	}
-
+	
+	/**
+	 * 
+	 * @return
+	 */
 	public static boolean isCurrentlySendingData() {
 		return SweetBlue.currentlySendingData;
 	}
