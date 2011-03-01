@@ -241,24 +241,27 @@ public class SweetBlue {
 		header[1] = (byte) 0xff;
 		header[2] = (byte) 0x02;
 		header[3] = (byte) in.length;
-
+		
 		/* Create the checksum byte */
 		byte checksum = 0;
 		checksum = (byte) (header[2] ^ header[3]);
 		for (int i = 0; i < in.length; i++)
-			checksum ^= in[i];
+			checksum ^= in[i];	
 
 		/* Data fix, making sure we won't have two 0xff in a row */
 		for (int i = 1; i < in.length; i += 2)
 			in[i] |= 0x80;
 
-		// Assemble the whole package
+		/* Final assembly... */
 		byte[] outdata = new byte[header.length + in.length + 1];
 		int i = 0;
+		/* ...header */
 		for (int index = 0; index < header.length; index++, i++)
 			outdata[i] = header[index];
+		/* ...data */
 		for (int index = 0; index < in.length; index++, i++)
 			outdata[i] = in[index];
+		/* ...chksum */
 		outdata[outdata.length - 1] = checksum;
 
 		return outdata;
