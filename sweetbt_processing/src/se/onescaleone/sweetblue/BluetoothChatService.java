@@ -101,10 +101,10 @@ public class BluetoothChatService {
 	 * @param handler
 	 *            A Handler to send messages back to the UI Activity
 	 */
-	public BluetoothChatService(/*Context context, Handler handler*/) {
+	public BluetoothChatService(/* Context context, */Handler handler) {
 		mAdapter = BluetoothAdapter.getDefaultAdapter();
 		mState = STATE_NONE;
-		//Handler = handler;
+		mHandler = handler;
 	}
 
 	/**
@@ -119,8 +119,8 @@ public class BluetoothChatService {
 		mState = state;
 
 		// Give the new state to the Handler so the UI Activity can update
-		/*mHandler.obtainMessage(MainView.MESSAGE_STATE_CHANGE, state, -1)
-				.sendToTarget();*/
+		mHandler.obtainMessage(SweetBlue.MESSAGE_STATE_CHANGE, state, -1)
+				.sendToTarget();
 	}
 
 	/**
@@ -225,11 +225,11 @@ public class BluetoothChatService {
 		mConnectedThread.start();
 
 		// Send the name of the connected device back to the UI Activity
-		/*Message msg = mHandler.obtainMessage(MainView.MESSAGE_DEVICE_NAME);
+		Message msg = mHandler.obtainMessage(SweetBlue.MESSAGE_DEVICE_NAME);
 		Bundle bundle = new Bundle();
-		bundle.putString(MainView.DEVICE_NAME, device.getName());
+		bundle.putString(SweetBlue.DEVICE_NAME, device.getName());
 		msg.setData(bundle);
-		mHandler.sendMessage(msg);*/
+		mHandler.sendMessage(msg);
 
 		setState(STATE_CONNECTED);
 	}
@@ -282,11 +282,13 @@ public class BluetoothChatService {
 		setState(STATE_LISTEN);
 
 		// Send a failure message back to the Activity
-		/*Message msg = mHandler.obtainMessage(MainView.MESSAGE_TOAST);
+
+		Message msg = mHandler.obtainMessage(SweetBlue.MESSAGE_TOAST);
 		Bundle bundle = new Bundle();
-		bundle.putString(MainView.TOAST, "Unable to connect device");
+		bundle.putString(SweetBlue.TOAST, "Unable to connect device");
 		msg.setData(bundle);
-		mHandler.sendMessage(msg);*/
+		mHandler.sendMessage(msg);
+
 	}
 
 	/**
@@ -296,11 +298,13 @@ public class BluetoothChatService {
 		setState(STATE_LISTEN);
 
 		// Send a failure message back to the Activity
-		/*Message msg = mHandler.obtainMessage(MainView.MESSAGE_TOAST);
+
+		Message msg = mHandler.obtainMessage(SweetBlue.MESSAGE_TOAST);
 		Bundle bundle = new Bundle();
-		bundle.putString(MainView.TOAST, "Device connection was lost");
+		bundle.putString(SweetBlue.TOAST, "Device connection was lost");
 		msg.setData(bundle);
-		mHandler.sendMessage(msg);*/
+		mHandler.sendMessage(msg);
+
 	}
 
 	/**
@@ -492,21 +496,85 @@ public class BluetoothChatService {
 					bytes = mmInStream.read(buffer);
 
 					// Send the obtained bytes to the UI Activity
-					/*mHandler.obtainMessage(MainView.MESSAGE_READ, bytes, -1,
-							buffer).sendToTarget();*/
-					
-					/*StringBuilder sb = new StringBuilder();
-					for( int i = 0; i < buffer.length; i++ )
-						sb.append(buffer[i]).append(",");
 
-					Log.i("Reading from... ", sb.toString());
-					*/
+					mHandler.obtainMessage(SweetBlue.MESSAGE_READ, bytes, -1,
+							buffer).sendToTarget();
+
+					// TEMP just send the recieved data buffer back to PDE
+					/*
+					 * StringBuilder sb = new StringBuilder(); for (int i = 0; i
+					 * < buffer.length; i++) { sb.append(buffer[i]).append(",");
+					 * } Message msg = mHandler
+					 * .obtainMessage(SweetBlue.MESSAGE_READ); Bundle bundle =
+					 * new Bundle(); bundle.putString(SweetBlue.DATA_STRING,
+					 * sb.toString()); msg.setData(bundle);
+					 * mHandler.sendMessage(msg);
+					 */
+					// END TEMP
+
+					byte[] data = parseReadBuffer(buffer);
+
+					if (data != null) {
+						Message msg = mHandler
+								.obtainMessage(SweetBlue.MESSAGE_READ);
+						Bundle bundle = new Bundle();
+						bundle.putByteArray(SweetBlue.DATA_STRING, data);
+						msg.setData(bundle);
+						mHandler.sendMessage(msg);
+					}
+					/*
+					 * StringBuilder sb = new StringBuilder(); for( int i = 0; i
+					 * < buffer.length; i++ ) sb.append(buffer[i]).append(",");
+					 * 
+					 * Log.i("Reading from... ", sb.toString());
+					 */
 				} catch (IOException e) {
 					Log.e(TAG, "disconnected", e);
 					connectionLost();
 					break;
 				}
 			}
+		}
+
+		private byte[] parseReadBuffer(byte[] buffer) {
+			int headerstart = -1;
+
+			/*
+			 * Find the foot print, [0xff][0xff], this marks the beginning of
+			 * the header
+			 */
+			for (int i = 0; i < buffer.length - 1; i++) {
+				headerstart = (buffer[i] == (byte) 0xff && buffer[i + 1] == (byte) 0xff) ? i
+						: -1;
+			}
+
+			if (headerstart != -1) {
+				/* Get the package information */
+				byte cmd = buffer[headerstart + 2];
+				byte datalen = buffer[headerstart + 3];
+
+				int headerlen = 4;
+
+				/* Get the data */
+				byte[] data = new byte[(int) datalen];
+				int dataindex = 0;
+				for (int i = headerstart + headerlen; i < headerstart
+						+ headerlen + datalen; i++, dataindex++)
+					data[dataindex] = buffer[i];
+
+				/* Get the chksum */
+				byte chksum = buffer[headerstart + headerlen + datalen];
+
+				/* Calculate the chksum and compare to the read chksum */
+				byte readchksum = (byte) (cmd ^ datalen);
+
+				if (chksum == readchksum)
+					return data;
+				else
+					return null;
+			}
+
+			return null;
 		}
 
 		/**
@@ -518,15 +586,14 @@ public class BluetoothChatService {
 		public void write(byte[] buffer) {
 			try {
 				mmOutStream.write(buffer);
-				
+
 				/* For debugging purposes */
 				StringBuilder out = new StringBuilder();
 				out.append("Writing buffer... ");
 				for (int b = 0; b < buffer.length; b++)
 					out.append(buffer[b]).append(",");
 				Log.i("Writing to BT device", out.toString());
-				
-				
+
 			} catch (IOException e) {
 				Log.e(TAG, "Exception during write", e);
 			}

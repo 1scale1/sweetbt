@@ -25,10 +25,13 @@
 
 package se.onescaleone.sweetblue;
 
+import processing.core.PApplet;
 import android.bluetooth.BluetoothAdapter;
 import android.os.Handler;
 import android.os.Looper;
-import processing.core.*;
+import android.os.Message;
+import android.util.Log;
+import android.widget.Toast;
 
 /**
  * This is a template class and can be used to start a new processing library or
@@ -54,8 +57,31 @@ public class SweetBlue {
 	private BluetoothChatService mChatService = null;
 	private static boolean currentlySendingData = false;
 
+	private int state = -1;
+	public static final int STATE_CONNECTED = 18;
+	public static final int STATE_DISCONNECTED = 28;
+
 	/* Link to the applications main handler */
 	private Handler mainHandler;
+	private Handler recieveHandler;
+
+	/* Bluetooth constants, handler messages */
+	public static final int MESSAGE_STATE_CHANGE = 19;
+	public static final int MESSAGE_READ = 29;
+	public static final int MESSAGE_WRITE = 39;
+	public static final int MESSAGE_DEVICE_NAME = 49;
+	public static final int MESSAGE_TOAST = 59;
+	public static final int MESSATE_TEST_VIBRATOR = 69;
+	// Key names received from the BluetoothChatService Handler
+	public static final String DEVICE_NAME = "device_name";
+	public static final String DATA_STRING = "data_string";
+	public static final String TOAST = "toast";
+
+	/* Arduino Constants */
+	public static final int INPUT = 0;
+	public static final int OUTPUT = 1;
+	public static final int HIGH = 2;
+	public static final int LOW = 3;
 
 	/**
 	 * a Constructor, usually called in the setup() method in your sketch to
@@ -88,12 +114,51 @@ public class SweetBlue {
 				@Override
 				public void run() {
 
+					// init the handler (recieve messages from bt thread)
+					if (recieveHandler == null)
+						recieveHandler = new Handler() {
+
+							@Override
+							public void handleMessage(Message msg) {
+
+								switch (msg.what) {
+								case MESSAGE_STATE_CHANGE:
+
+									switch (msg.arg1) {
+									case BluetoothChatService.STATE_CONNECTED:
+										state = STATE_CONNECTED;
+										break;
+									case BluetoothChatService.STATE_CONNECTING:
+										state = STATE_DISCONNECTED;
+										break;
+									case BluetoothChatService.STATE_LISTEN:
+										state = STATE_DISCONNECTED;
+										break;
+									case BluetoothChatService.STATE_NONE:
+										state = STATE_DISCONNECTED;
+										break;
+									}
+									break;
+								case MESSAGE_DEVICE_NAME:
+									// Print the connected device name to PDE
+									myParent.println(msg.getData().getString(
+											DEVICE_NAME)
+											+ " connected.");
+									break;
+								case MESSAGE_READ:
+									// Read from the output stream...
+									myParent.println(msg.getData().getByteArray(
+											DATA_STRING));
+									break;
+								}
+							}
+
+						};
 					// init the chatservice
-					if (mChatService == null)
-						mChatService = new BluetoothChatService();
+					if (mChatService == null && recieveHandler != null)
+						mChatService = new BluetoothChatService(recieveHandler);
 
 					// Connect the chatservice
-
 					mChatService.connect(BluetoothAdapter.getDefaultAdapter()
 							.getRemoteDevice(mac));
 				}
@@ -114,10 +179,6 @@ public class SweetBlue {
 		System.out.println("##name## ##version## by ##author##");
 	}
 
-	public String sayHello() {
-		return "hello library.";
-	}
-
 	/**
 	 * return the version of the library.
 	 * 
@@ -128,6 +189,8 @@ public class SweetBlue {
 	}
 
 	/**
+	 * DEPRECATED
+	 * 
 	 * Tries to write data to the bluetooth port.
 	 * 
 	 * byte[]
@@ -149,6 +212,8 @@ public class SweetBlue {
 	}
 
 	/**
+	 * DEPRECATED
+	 * 
 	 * Tries to write data to the bluetooth port.
 	 * 
 	 * byte[]
@@ -166,6 +231,8 @@ public class SweetBlue {
 	}
 
 	/**
+	 * DEPRECATED
+	 * 
 	 * Tries to write data to the bluetooth port.
 	 * 
 	 * int
@@ -187,7 +254,7 @@ public class SweetBlue {
 		}
 		return null;
 	}
-	
+
 	/**
 	 * 
 	 * @return
@@ -214,10 +281,94 @@ public class SweetBlue {
 	}
 
 	public int getState() {
-		if (mChatService != null)
-			return mChatService.getState();
-		else
-			return 0;
+		return state;
+	}
+
+	/**
+	 * Changes the mode of a pin on the ArduinoBT.
+	 * 
+	 * example: pinMode( 1, SweetBlue.OUTPUT );
+	 * 
+	 * @param pin
+	 *            number on the ArduinoBT
+	 * @param mode
+	 *            OUTPUT or INPUT
+	 * @return null (if fail) or the sent byte[]
+	 */
+	public byte[] pinMode(int pin, int mode) {
+		switch (mode) {
+		case INPUT:
+			/* TODO - Set PIN to INPUT */
+			if (mChatService != null
+					&& mChatService.getState() == BluetoothChatService.STATE_CONNECTED) {
+				mChatService.write(attachHeaderBytes(null));
+				return new byte[] {};
+			} else {
+				return null;
+			}
+		case OUTPUT:
+			/* TODO - Set PIN to OUTPUT */
+			if (mChatService != null
+					&& mChatService.getState() == BluetoothChatService.STATE_CONNECTED) {
+				mChatService.write(attachHeaderBytes(null));
+				return new byte[] {};
+			} else {
+				return null;
+			}
+		}
+
+		return null;
+	}
+
+	/**
+	 * Writes HIGH or LOW to the specified pin on the ArduinoBT.
+	 * 
+	 * example: ditialWrite( 2, SweetBlue.HIGH );
+	 * 
+	 * @param pin
+	 *            number on the ArduinoBT
+	 * @param value
+	 *            HIGH or LOW
+	 * @return null (if fail) or the sent byte[]
+	 */
+	public byte[] digitalWrite(int pin, int value) {
+		switch (value) {
+		case HIGH:
+			/* TODO - Write PIN to HIGH */
+			if (mChatService != null
+					&& mChatService.getState() == BluetoothChatService.STATE_CONNECTED) {
+				mChatService.write(attachHeaderBytes(null));
+				return new byte[] {};
+			} else {
+				return null;
+			}
+		case LOW:
+			/* TODO - Write PIN to LOW */
+			if (mChatService != null
+					&& mChatService.getState() == BluetoothChatService.STATE_CONNECTED) {
+				mChatService.write(attachHeaderBytes(null));
+				return new byte[] {};
+			} else {
+				return null;
+			}
+		}
+		return null;
+	}
+
+	/**
+	 * Reads value from pin.
+	 * 
+	 * @param pin
+	 * @return null if failed, or the read byte[]
+	 */
+	public byte[] digitalRead(int pin) {
+		if (mChatService != null
+				&& mChatService.getState() == BluetoothChatService.STATE_CONNECTED) {
+			mChatService.write(attachHeaderBytes(null));
+			return new byte[] {};
+		} else {
+			return null;
+		}
 	}
 
 	/**
@@ -241,16 +392,17 @@ public class SweetBlue {
 		header[1] = (byte) 0xff;
 		header[2] = (byte) 0x02;
 		header[3] = (byte) in.length;
-		
+
 		/* Create the checksum byte */
 		byte checksum = 0;
 		checksum = (byte) (header[2] ^ header[3]);
 		for (int i = 0; i < in.length; i++)
-			checksum ^= in[i];	
+			checksum ^= in[i];
 
 		/* Data fix, making sure we won't have two 0xff in a row */
-		for (int i = 1; i < in.length; i += 2)
-			in[i] |= 0x80;
+		// Removed because it caused issues...
+		// for (int i = 1; i < in.length; i += 2)
+		// in[i] |= 0x80;
 
 		/* Final assembly... */
 		byte[] outdata = new byte[header.length + in.length + 1];
