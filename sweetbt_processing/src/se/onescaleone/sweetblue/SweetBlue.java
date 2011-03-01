@@ -225,7 +225,7 @@ public class SweetBlue {
 	 * 
 	 * HEADER(4 bytes) - DATA(x bytes) - CHECKSUM(1 byte)
 	 * 
-	 * Header: [FOOTPRINT][FOOTPRINT][COMMAND][LENGTH]:(0xff)(0xff)(0x??)(0x??)
+	 * Header: [FOOTPRINT][FOOTPRINT][COMMAND][LENGTH]: (0xff)(0xff)(0x??)(0x??)
 	 * 
 	 * Data: [DATA]...: (0 - 127)
 	 * 
