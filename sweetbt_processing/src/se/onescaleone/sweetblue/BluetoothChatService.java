@@ -496,9 +496,8 @@ public class BluetoothChatService {
 					bytes = mmInStream.read(buffer);
 
 					// Send the obtained bytes to the UI Activity
-
-					mHandler.obtainMessage(SweetBlue.MESSAGE_READ, bytes, -1,
-							buffer).sendToTarget();
+					/*mHandler.obtainMessage(SweetBlue.MESSAGE_READ, bytes, -1,
+							buffer).sendToTarget();*/
 
 					// TEMP just send the recieved data buffer back to PDE
 					/*

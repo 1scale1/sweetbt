@@ -147,8 +147,12 @@ public class SweetBlue {
 									break;
 								case MESSAGE_READ:
 									// Read from the output stream...
-									myParent.println(msg.getData().getByteArray(
-											DATA_STRING));
+									byte[] data = msg.getData().getByteArray(
+											DATA_STRING);
+									StringBuilder sb = new StringBuilder();
+									for (int i = 0; i < data.length; i++)
+										sb.append(data[i]).append(",");
+									myParent.println(sb.toString());
 									break;
 								}
 							}
@@ -295,28 +299,16 @@ public class SweetBlue {
 	 *            OUTPUT or INPUT
 	 * @return null (if fail) or the sent byte[]
 	 */
-	public byte[] pinMode(int pin, int mode) {
+	public byte[] pinMode(final int pin, int mode) {
 		switch (mode) {
 		case INPUT:
-			/* TODO - Set PIN to INPUT */
-			if (mChatService != null
-					&& mChatService.getState() == BluetoothChatService.STATE_CONNECTED) {
-				mChatService.write(attachHeaderBytes(null));
-				return new byte[] {};
-			} else {
-				return null;
-			}
+			mChatService.write(assemblePackage((byte) pin, (byte) 0x01,
+					(byte) 0x00));
+			break;
 		case OUTPUT:
-			/* TODO - Set PIN to OUTPUT */
-			if (mChatService != null
-					&& mChatService.getState() == BluetoothChatService.STATE_CONNECTED) {
-				mChatService.write(attachHeaderBytes(null));
-				return new byte[] {};
-			} else {
-				return null;
-			}
+			mChatService.write(assemblePackage((byte) pin, (byte) 0x00,
+					(byte) 0x01));
 		}
-
 		return null;
 	}
 
@@ -331,27 +323,18 @@ public class SweetBlue {
 	 *            HIGH or LOW
 	 * @return null (if fail) or the sent byte[]
 	 */
-	public byte[] digitalWrite(int pin, int value) {
+	public byte[] digitalWrite(final int pin, int value) {
 		switch (value) {
-		case HIGH:
-			/* TODO - Write PIN to HIGH */
-			if (mChatService != null
-					&& mChatService.getState() == BluetoothChatService.STATE_CONNECTED) {
-				mChatService.write(attachHeaderBytes(null));
-				return new byte[] {};
-			} else {
-				return null;
-			}
-		case LOW:
-			/* TODO - Write PIN to LOW */
-			if (mChatService != null
-					&& mChatService.getState() == BluetoothChatService.STATE_CONNECTED) {
-				mChatService.write(attachHeaderBytes(null));
-				return new byte[] {};
-			} else {
-				return null;
-			}
+		case SweetBlue.HIGH:
+			mChatService.write(assemblePackage((byte) pin, (byte) 0x03,
+					(byte) 0x01));
+			break;
+		case SweetBlue.LOW:
+			mChatService.write(assemblePackage((byte) pin, (byte) 0x03,
+					(byte) 0x00));
+			break;
 		}
+
 		return null;
 	}
 
@@ -372,6 +355,46 @@ public class SweetBlue {
 	}
 
 	/**
+	 * Assembles the Arduino command package and prepares it for bluetooth;
+	 * 
+	 * @param pin
+	 * @param cmd
+	 * @param val
+	 */
+	private byte[] assemblePackage(byte pin, byte cmd, byte val) {
+		/* Header */
+		// [FP][FP][cmd][len][arduino][pin][val][chksum]
+
+		/* Create the package */
+		byte[] buffer = new byte[8];
+
+		/* Footprint */
+		buffer[0] = (byte) 0xff;
+		buffer[1] = (byte) 0xff;
+
+		/* Main command - 0x02 right now */
+		buffer[2] = (byte) 0x02;
+
+		/* Length, it's always the same size... for now */
+		buffer[3] = (byte) 0x03;
+
+		/* Arduino command - pinmode, digitalwrite, analogread... etc */
+		buffer[4] = cmd;
+
+		/* The pin on which to act */
+		buffer[5] = pin;
+
+		/* The value */
+		buffer[6] = val;
+
+		/* The checksum - cmd ^ pin ^ val */
+		buffer[7] = (byte) ((((buffer[2] ^ buffer[3]) ^ cmd) ^ pin) ^ val);
+
+		return buffer;
+	}
+
+	/**
+	 * 
 	 * Used to organize data before transmitting to bluetooth device.
 	 * 
 	 * HEADER(4 bytes) - DATA(x bytes) - CHECKSUM(1 byte)
@@ -384,7 +407,11 @@ public class SweetBlue {
 	 * 
 	 * @param in
 	 * @return
+	 * @deprecated This function is used for the Sweet tool, the library uses
+	 *             the newer "firmata" like function to communicate with
+	 *             ArduinoBT.
 	 */
+	@Deprecated
 	private byte[] attachHeaderBytes(byte[] in) {
 		/* Create the header bytes */
 		byte[] header = new byte[4];
