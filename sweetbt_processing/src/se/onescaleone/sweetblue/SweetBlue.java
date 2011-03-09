@@ -25,13 +25,14 @@
 
 package se.onescaleone.sweetblue;
 
+import java.util.HashMap;
+
 import processing.core.PApplet;
 import android.bluetooth.BluetoothAdapter;
 import android.os.Handler;
 import android.os.Looper;
 import android.os.Message;
 import android.util.Log;
-import android.widget.Toast;
 
 /**
  * This is a template class and can be used to start a new processing library or
@@ -48,6 +49,19 @@ import android.widget.Toast;
 
 public class SweetBlue {
 
+	/*
+	 * This is NOT NEEDED, just use the handler!!! // Create the listener list
+	 * protected EventListenerList listenerList = new EventListenerList();
+	 * 
+	 * // This methods allows classes to register for MyEvents public void
+	 * addMyEventListener(ArduinoEventListener listener) {
+	 * listenerList.add(ArduinoEventListener.class, listener); }
+	 * 
+	 * // This methods allows classes to unregister for MyEvents public void
+	 * removeMyEventListener(ArduinoEventListener listener) {
+	 * listenerList.remove(ArduinoEventListener.class, listener); }
+	 */
+
 	// myParent is a reference to the parent sketch
 	PApplet myParent;
 
@@ -56,6 +70,10 @@ public class SweetBlue {
 	/* Contains threads to control the communication */
 	private BluetoothChatService mChatService = null;
 	private static boolean currentlySendingData = false;
+
+	/* Debug variables */
+	public static boolean DEBUG = false;
+	public static String DEBUGTAG = "##name## ##version## Debug message: ";
 
 	private int state = -1;
 	public static final int STATE_CONNECTED = 18;
@@ -72,16 +90,22 @@ public class SweetBlue {
 	public static final int MESSAGE_DEVICE_NAME = 49;
 	public static final int MESSAGE_TOAST = 59;
 	public static final int MESSATE_TEST_VIBRATOR = 69;
+	// public static final int MESSAGE_ECHO = 79;
+
 	// Key names received from the BluetoothChatService Handler
 	public static final String DEVICE_NAME = "device_name";
 	public static final String DATA_STRING = "data_string";
+	public static final String DATA_VALUE = "data_value";
 	public static final String TOAST = "toast";
 
 	/* Arduino Constants */
-	public static final int INPUT = 0;
-	public static final int OUTPUT = 1;
-	public static final int HIGH = 2;
-	public static final int LOW = 3;
+	public static final int HIGH = 1;
+	public static final int LOW = 0;
+	public static final int INPUT = 6;
+	public static final int OUTPUT = 7;
+
+	/* Map containing all pins and their read-values */
+	private HashMap<Integer, Integer> values;
 
 	/**
 	 * a Constructor, usually called in the setup() method in your sketch to
@@ -93,6 +117,9 @@ public class SweetBlue {
 	public SweetBlue(PApplet theParent) {
 		myParent = theParent;
 		welcome();
+
+		/* Init hashmap */
+		values = new HashMap<Integer, Integer>();
 	}
 
 	/**
@@ -146,14 +173,33 @@ public class SweetBlue {
 											+ " connected.");
 									break;
 								case MESSAGE_READ:
-									// Read from the output stream...
-									byte[] data = msg.getData().getByteArray(
-											DATA_STRING);
-									StringBuilder sb = new StringBuilder();
-									for (int i = 0; i < data.length; i++)
-										sb.append(data[i]).append(",");
-									myParent.println(sb.toString());
+									// Read from the output stream... byte[]
+									int[] data = msg.getData().getIntArray(
+											DATA_VALUE);
+
+									/* Add the value to the hashmap */
+									if (data != null)
+										values.put(data[0], data[1]);
+
+									if (SweetBlue.DEBUG) {
+										/* Print the read data array */
+										StringBuffer sb = new StringBuffer();
+										for (int i = 0; i < data.length; i++)
+											sb.append(data[i]).append(",");
+										Log.i("System.out", SweetBlue.DEBUGTAG
+												+ sb.toString());
+									}
 									break;
+								/*
+								 * This shouldn't be needed, we're using the
+								 * "System.out" instead case MESSAGE_ECHO: //
+								 * Read from the output stream... string String
+								 * echo = msg.getData().getString( DATA_STRING);
+								 * myParent.println("==== START ECHO ====");
+								 * myParent.println(echo);
+								 * myParent.println("==== END ECHO ====");
+								 * break;
+								 */
 								}
 							}
 
@@ -165,6 +211,8 @@ public class SweetBlue {
 					// Connect the chatservice
 					mChatService.connect(BluetoothAdapter.getDefaultAdapter()
 							.getRemoteDevice(mac));
+
+					// Add the listener
 				}
 			});
 
@@ -243,6 +291,7 @@ public class SweetBlue {
 	 * 
 	 * @param data
 	 */
+	@Deprecated
 	public byte[] write(int value) {
 		if (!this.isCurrentlySendingData()) {
 			byte[] data = new byte[4];
@@ -293,6 +342,9 @@ public class SweetBlue {
 	 * 
 	 * example: pinMode( 1, SweetBlue.OUTPUT );
 	 * 
+	 * Note: Pins 0, 1, and 7 are a big NO-NO! These pins are connected to the
+	 * bluetooth communication and reset and shouldn't be used!
+	 * 
 	 * @param pin
 	 *            number on the ArduinoBT
 	 * @param mode
@@ -306,7 +358,7 @@ public class SweetBlue {
 					(byte) 0x00));
 			break;
 		case OUTPUT:
-			mChatService.write(assemblePackage((byte) pin, (byte) 0x00,
+			mChatService.write(assemblePackage((byte) pin, (byte) 0x01,
 					(byte) 0x01));
 		}
 		return null;
@@ -321,41 +373,69 @@ public class SweetBlue {
 	 *            number on the ArduinoBT
 	 * @param value
 	 *            HIGH or LOW
-	 * @return null (if fail) or the sent byte[]
 	 */
-	public byte[] digitalWrite(final int pin, int value) {
-		switch (value) {
-		case SweetBlue.HIGH:
-			mChatService.write(assemblePackage((byte) pin, (byte) 0x03,
-					(byte) 0x01));
-			break;
-		case SweetBlue.LOW:
-			mChatService.write(assemblePackage((byte) pin, (byte) 0x03,
-					(byte) 0x00));
-			break;
-		}
-
-		return null;
+	public void digitalWrite(final int pin, int value) {
+		mChatService.write(assemblePackage((byte) pin, (byte) 0x03,
+				(byte) value));
 	}
 
 	/**
 	 * Reads value from pin.
 	 * 
 	 * @param pin
-	 * @return null if failed, or the read byte[]
+	 * @param variable
 	 */
-	public byte[] digitalRead(int pin) {
-		if (mChatService != null
-				&& mChatService.getState() == BluetoothChatService.STATE_CONNECTED) {
-			mChatService.write(attachHeaderBytes(null));
-			return new byte[] {};
-		} else {
-			return null;
-		}
+	public void digitalRead(int pin, int[] variable) {
+		mChatService
+				.write(assemblePackage((byte) pin, (byte) 0x02, (byte) 0x00));
+
+		/**/
+		// Read the last position/value of the selected pin in the map
+		// return values.get(pin);
+
+		variable[0] = values.get(pin);
 	}
 
 	/**
-	 * Assembles the Arduino command package and prepares it for bluetooth;
+	 * Writes value to the specified pin on the ArduinoBT.
+	 * 
+	 * example: analogWrite( 2, 127 );
+	 * 
+	 * @param pin
+	 *            number on the ArduinoBT
+	 * @param value
+	 *            0 - 255
+	 */
+	public void analogWrite(final int pin, int value) {
+		if (value >= 0 && value <= 255)
+			mChatService.write(assemblePackage((byte) pin, (byte) 0x03,
+					(byte) value));
+		else
+			Log.i("System.out", SweetBlue.DEBUGTAG
+					+ "Bad value on analogWrite!");
+	}
+
+	/**
+	 * Reads value from pin.
+	 * 
+	 * IMPORTANT! To "fix" the issue of pass-by-value on primitives, we need the
+	 * variable to be non-primitive. An array will do fine for solving this
+	 * initially.
+	 * 
+	 * @param pin
+	 *            The pin number to read
+	 * @param variable
+	 *            variable to which the reading should be written.
+	 */
+	public void analogRead(int pin, int[] variable) {
+		mChatService
+				.write(assemblePackage((byte) pin, (byte) 0x02, (byte) 0x00));
+
+		variable[0] = values.get(pin);
+	}
+
+	/**
+	 * Assembles the Arduino command package and prepares it for serial
 	 * 
 	 * @param pin
 	 * @param cmd
@@ -363,7 +443,7 @@ public class SweetBlue {
 	 */
 	private byte[] assemblePackage(byte pin, byte cmd, byte val) {
 		/* Header */
-		// [FP][FP][cmd][len][arduino][pin][val][chksum]
+		// [FP][FP][cmd][len][arduinocmd][pin][val][chksum]
 
 		/* Create the package */
 		byte[] buffer = new byte[8];
@@ -387,7 +467,7 @@ public class SweetBlue {
 		/* The value */
 		buffer[6] = val;
 
-		/* The checksum - cmd ^ pin ^ val */
+		/* The checksum - cmd ^ len ^ arduinocmd ^ pin ^ val */
 		buffer[7] = (byte) ((((buffer[2] ^ buffer[3]) ^ cmd) ^ pin) ^ val);
 
 		return buffer;

@@ -64,7 +64,6 @@ import android.util.Log;
  * performing data transmissions when connected.
  */
 public class BluetoothChatService {
-	// Debugging
 	private static final String TAG = "BluetoothChatService";
 	private static final boolean D = true;
 
@@ -117,6 +116,10 @@ public class BluetoothChatService {
 		if (D)
 			Log.d(TAG, "setState() " + mState + " -> " + state);
 		mState = state;
+
+		if (SweetBlue.DEBUG)
+			Log.i("System.out", SweetBlue.DEBUGTAG + " setState() " + mState
+					+ " -> " + state);
 
 		// Give the new state to the Handler so the UI Activity can update
 		mHandler.obtainMessage(SweetBlue.MESSAGE_STATE_CHANGE, state, -1)
@@ -495,32 +498,18 @@ public class BluetoothChatService {
 					// Read from the InputStream
 					bytes = mmInStream.read(buffer);
 
-					// Send the obtained bytes to the UI Activity
-					/*mHandler.obtainMessage(SweetBlue.MESSAGE_READ, bytes, -1,
-							buffer).sendToTarget();*/
-
-					// TEMP just send the recieved data buffer back to PDE
-					/*
-					 * StringBuilder sb = new StringBuilder(); for (int i = 0; i
-					 * < buffer.length; i++) { sb.append(buffer[i]).append(",");
-					 * } Message msg = mHandler
-					 * .obtainMessage(SweetBlue.MESSAGE_READ); Bundle bundle =
-					 * new Bundle(); bundle.putString(SweetBlue.DATA_STRING,
-					 * sb.toString()); msg.setData(bundle);
-					 * mHandler.sendMessage(msg);
-					 */
-					// END TEMP
-
-					byte[] data = parseReadBuffer(buffer);
-
-					if (data != null) {
-						Message msg = mHandler
-								.obtainMessage(SweetBlue.MESSAGE_READ);
-						Bundle bundle = new Bundle();
-						bundle.putByteArray(SweetBlue.DATA_STRING, data);
-						msg.setData(bundle);
-						mHandler.sendMessage(msg);
+					/* For debugging purposes */
+					if (SweetBlue.DEBUG) {
+						StringBuilder in = new StringBuilder();
+						in.append("Reading buffer... ");
+						for (int b = 0; b < bytes; b++)
+							in.append(buffer[b]).append(",");
+						Log.i("System.out", SweetBlue.DEBUGTAG + in.toString());
 					}
+
+					/* Should maybe indicate how many bytes are read? */
+					byte[] data = parseReadBuffer(buffer, bytes);
+
 					/*
 					 * StringBuilder sb = new StringBuilder(); for( int i = 0; i
 					 * < buffer.length; i++ ) sb.append(buffer[i]).append(",");
@@ -535,42 +524,127 @@ public class BluetoothChatService {
 			}
 		}
 
-		private byte[] parseReadBuffer(byte[] buffer) {
+		/**
+		 * This parses the input stream of the connected bluetooth socket. The
+		 * package is constructed the same way as the output socket (to BT)
+		 * 
+		 * [FOOTPRINT][FOOTPRINT][CMD][LEN][AA][PP][XX][YY][CC]
+		 * 
+		 * CMD - board status LEN - command length AA - arduino command PP - pin
+		 * XX - read value 1 YY - read value 2 CC - checksum
+		 * 
+		 * @param buffer
+		 * @return
+		 */
+		private byte[] parseReadBuffer(byte[] buffer, int bytes) {
 			int headerstart = -1;
+
+			boolean failedheader = true;
 
 			/*
 			 * Find the foot print, [0xff][0xff], this marks the beginning of
 			 * the header
 			 */
-			for (int i = 0; i < buffer.length - 1; i++) {
+			for (int i = 0; i < bytes - 1; i++) {
 				headerstart = (buffer[i] == (byte) 0xff && buffer[i + 1] == (byte) 0xff) ? i
 						: -1;
+
+				/* We found a possible package... */
+				if (headerstart != -1) {
+					/* Get the board cmd */
+					byte cmd = buffer[headerstart + 2];
+
+					/* Get the data length */
+					byte datalen = buffer[headerstart + 3];
+
+					/* Get the arduino cmd */
+					byte arduinocmd = buffer[headerstart + 4];
+
+					/* Get the pin */
+					byte pin = buffer[headerstart + 5];
+
+					/* Get XX */
+					byte xx = buffer[headerstart + 6];
+
+					/* If read-error */
+					if (xx == (byte) 0xff) {
+						if (SweetBlue.DEBUG)
+							Log.i("processing.android.sweetblue",
+									SweetBlue.DEBUGTAG + "Failed value check!");
+						continue;
+					}
+
+					/* get YY */
+					byte yy = buffer[headerstart + 7];
+
+					/* get the sent chksum */
+					byte readchksum = buffer[headerstart + 8];
+
+					/* calculate the chksum and compare */
+					byte calcchksum = 0;
+					for (int j = 2; j < 8; j++)
+						calcchksum ^= buffer[headerstart + j];
+
+					if (readchksum != calcchksum) {
+
+						if (SweetBlue.DEBUG)
+							Log.i("processing.android.sweetblue",
+									SweetBlue.DEBUGTAG + "Failed checksum!");
+						continue;
+					} else {
+						/* Failed header? -- no! */
+						failedheader = false;
+
+						/* Things should be OK here... let's return the package */
+						/*
+						 * BAH! we can't return here, that means we're not
+						 * parsing the rest of the buffer dude!
+						 */
+						/*
+						 * return new byte[] { buffer[headerstart],
+						 * buffer[headerstart + 1], buffer[headerstart + 2],
+						 * buffer[headerstart + 3], buffer[headerstart + 4],
+						 * buffer[headerstart + 5], buffer[headerstart + 6],
+						 * buffer[headerstart + 7], buffer[headerstart + 8] };
+						 */
+
+						/* Assemble the package */
+						byte[] data = new byte[] { buffer[headerstart],
+								buffer[headerstart + 1],
+								buffer[headerstart + 2],
+								buffer[headerstart + 3],
+								buffer[headerstart + 4],
+								buffer[headerstart + 5],
+								buffer[headerstart + 6],
+								buffer[headerstart + 7],
+								buffer[headerstart + 8] };
+
+						/* Send the package to the activity */
+						Message msg = mHandler
+								.obtainMessage(SweetBlue.MESSAGE_READ);
+						Bundle bundle = new Bundle();
+						/* Temporary, we're just sending the byte[] */
+						// bundle.putByteArray(SweetBlue.DATA_VALUE, data);
+						bundle.putIntArray(SweetBlue.DATA_VALUE, new int[] { pin,
+								(xx * 256 + yy) });
+						msg.setData(bundle);
+						mHandler.sendMessage(msg);
+
+						if (SweetBlue.DEBUG)
+							Log.i("System.out", SweetBlue.DEBUGTAG
+									+ "Found ArduinoBT package!");
+					}
+				} else {
+					/* Failed finding header footprint */
+					// Log.i("processing.android", "Failed header footprint!");
+				}
+
 			}
 
-			if (headerstart != -1) {
-				/* Get the package information */
-				byte cmd = buffer[headerstart + 2];
-				byte datalen = buffer[headerstart + 3];
-
-				int headerlen = 4;
-
-				/* Get the data */
-				byte[] data = new byte[(int) datalen];
-				int dataindex = 0;
-				for (int i = headerstart + headerlen; i < headerstart
-						+ headerlen + datalen; i++, dataindex++)
-					data[dataindex] = buffer[i];
-
-				/* Get the chksum */
-				byte chksum = buffer[headerstart + headerlen + datalen];
-
-				/* Calculate the chksum and compare to the read chksum */
-				byte readchksum = (byte) (cmd ^ datalen);
-
-				if (chksum == readchksum)
-					return data;
-				else
-					return null;
+			if (failedheader) {
+				if (SweetBlue.DEBUG)
+					Log.i("System.out", SweetBlue.DEBUGTAG
+							+ "Failed header footprint!");
 			}
 
 			return null;
@@ -587,12 +661,13 @@ public class BluetoothChatService {
 				mmOutStream.write(buffer);
 
 				/* For debugging purposes */
-				StringBuilder out = new StringBuilder();
-				out.append("Writing buffer... ");
-				for (int b = 0; b < buffer.length; b++)
-					out.append(buffer[b]).append(",");
-				Log.i("Writing to BT device", out.toString());
-
+				if (SweetBlue.DEBUG) {
+					StringBuilder out = new StringBuilder();
+					out.append("Writing buffer... ");
+					for (int b = 0; b < buffer.length; b++)
+						out.append(buffer[b]).append(",");
+					Log.i("System.out", SweetBlue.DEBUGTAG + out.toString());
+				}
 			} catch (IOException e) {
 				Log.e(TAG, "Exception during write", e);
 			}
@@ -606,5 +681,4 @@ public class BluetoothChatService {
 			}
 		}
 	}
-
 }
