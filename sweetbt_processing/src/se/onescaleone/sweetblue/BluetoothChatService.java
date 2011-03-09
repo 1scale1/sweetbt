@@ -51,7 +51,6 @@ import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothServerSocket;
 import android.bluetooth.BluetoothSocket;
-import android.content.Context;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Message;
@@ -609,7 +608,7 @@ public class BluetoothChatService {
 						 */
 
 						/* Assemble the package */
-						byte[] data = new byte[] { buffer[headerstart],
+						/*byte[] data = new byte[] { buffer[headerstart],
 								buffer[headerstart + 1],
 								buffer[headerstart + 2],
 								buffer[headerstart + 3],
@@ -617,7 +616,7 @@ public class BluetoothChatService {
 								buffer[headerstart + 5],
 								buffer[headerstart + 6],
 								buffer[headerstart + 7],
-								buffer[headerstart + 8] };
+								buffer[headerstart + 8] };*/
 
 						/* Send the package to the activity */
 						Message msg = mHandler

@@ -49,19 +49,6 @@ import android.util.Log;
 
 public class SweetBlue {
 
-	/*
-	 * This is NOT NEEDED, just use the handler!!! // Create the listener list
-	 * protected EventListenerList listenerList = new EventListenerList();
-	 * 
-	 * // This methods allows classes to register for MyEvents public void
-	 * addMyEventListener(ArduinoEventListener listener) {
-	 * listenerList.add(ArduinoEventListener.class, listener); }
-	 * 
-	 * // This methods allows classes to unregister for MyEvents public void
-	 * removeMyEventListener(ArduinoEventListener listener) {
-	 * listenerList.remove(ArduinoEventListener.class, listener); }
-	 */
-
 	// myParent is a reference to the parent sketch
 	PApplet myParent;
 
@@ -118,7 +105,7 @@ public class SweetBlue {
 		myParent = theParent;
 		welcome();
 
-		/* Init hashmap */
+		/* Init hashmap, has only 16 spaces now though */
 		values = new HashMap<Integer, Integer>();
 	}
 
@@ -168,7 +155,7 @@ public class SweetBlue {
 									break;
 								case MESSAGE_DEVICE_NAME:
 									// Print the connected device name to PDE
-									myParent.println(msg.getData().getString(
+									PApplet.println(msg.getData().getString(
 											DEVICE_NAME)
 											+ " connected.");
 									break;
@@ -178,28 +165,23 @@ public class SweetBlue {
 											DATA_VALUE);
 
 									/* Add the value to the hashmap */
-									if (data != null)
+									if (data != null && values != null)
 										values.put(data[0], data[1]);
 
-									if (SweetBlue.DEBUG) {
+									if (SweetBlue.DEBUG && data != null) {
 										/* Print the read data array */
 										StringBuffer sb = new StringBuffer();
 										for (int i = 0; i < data.length; i++)
 											sb.append(data[i]).append(",");
+										Log.i("System.out",
+												SweetBlue.DEBUGTAG
+														+ "ArduinoBT package: "
+														+ sb.toString());
+									} else if (SweetBlue.DEBUG && data == null) {
 										Log.i("System.out", SweetBlue.DEBUGTAG
-												+ sb.toString());
+												+ "Read data is null!");
 									}
 									break;
-								/*
-								 * This shouldn't be needed, we're using the
-								 * "System.out" instead case MESSAGE_ECHO: //
-								 * Read from the output stream... string String
-								 * echo = msg.getData().getString( DATA_STRING);
-								 * myParent.println("==== START ECHO ====");
-								 * myParent.println(echo);
-								 * myParent.println("==== END ECHO ====");
-								 * break;
-								 */
 								}
 							}
 
@@ -388,12 +370,12 @@ public class SweetBlue {
 	public void digitalRead(int pin, int[] variable) {
 		mChatService
 				.write(assemblePackage((byte) pin, (byte) 0x02, (byte) 0x00));
-
-		/**/
-		// Read the last position/value of the selected pin in the map
-		// return values.get(pin);
-
-		variable[0] = values.get(pin);
+		
+		if (values.containsKey(pin))
+			variable[0] = values.get(pin);
+		else if (SweetBlue.DEBUG)
+			Log.i("System.out", SweetBlue.DEBUGTAG + "No value exists on pin "
+					+ pin);
 	}
 
 	/**
@@ -431,7 +413,11 @@ public class SweetBlue {
 		mChatService
 				.write(assemblePackage((byte) pin, (byte) 0x02, (byte) 0x00));
 
-		variable[0] = values.get(pin);
+		if (values.containsKey(pin))
+			variable[0] = values.get(pin);
+		else if (SweetBlue.DEBUG)
+			Log.i("System.out", SweetBlue.DEBUGTAG + "No value exists on pin "
+					+ pin);
 	}
 
 	/**
