@@ -17,29 +17,29 @@ package se.onescaleone.sweetblue;
  */
 
 /*
- *  Modified by Andreas Göransson, 1scale1 Handelsbolag, for use in the 
- *  project GPSSuit.
+ *  Modified by Andreas Göransson & David Cuartielles, 1scale1 Handelsbolag, 
+ *  for use in the project SweetBlue.
  *  
- *  GPSSuit - An application which let its users attach information to 
- *  geographical data and connect that data to a Bluetooth enabled device
- *  that allows for physical feedback through a large set of vibrators.
+ *  SweetBlue: a library and communication protocol used to set Arduino 
+ *  states over bluetooth from an Android device. Effectively removing 
+ *  the need to program the Arduino chip.
  *  
- *  Copyright (C) 2010  1scale1 Handelsbolag, Stahl Stenslie
+ *  Copyright (C) 2011  1scale1 Handelsbolag
  *
- *  This file is part of GPSSuit.
+ *  This file is part of SweetBlue.
  *
- *  GPSSuit is free software: you can redistribute it and/or modify
+ *  SweetBlue is free software: you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
  *  the Free Software Foundation, either version 3 of the License, or
  *  (at your option) any later version.
  *
- *  GPSSuit is distributed in the hope that it will be useful,
+ *  SweetBlue is distributed in the hope that it will be useful,
  *  but WITHOUT ANY WARRANTY; without even the implied warranty of
  *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  *  GNU General Public License for more details.
  *
  *  You should have received a copy of the GNU General Public License
- *  along with GPSSuit.  If not, see <http://www.gnu.org/licenses/>.
+ *  along with SweetBlue.  If not, see <http://www.gnu.org/licenses/>.
  */
 
 import java.io.IOException;
@@ -70,8 +70,7 @@ public class BluetoothChatService {
 	private static final String NAME = "BluetoothChat";
 
 	// Unique UUID for this application
-	private static final UUID MY_UUID = UUID
-			.fromString("00001101-0000-1000-8000-00805F9B34FB");
+	private static final UUID MY_UUID = UUID.fromString("00001101-0000-1000-8000-00805F9B34FB");
 
 	// Member fields
 	private final BluetoothAdapter mAdapter;
@@ -117,12 +116,10 @@ public class BluetoothChatService {
 		mState = state;
 
 		if (SweetBlue.DEBUG)
-			Log.i("System.out", SweetBlue.DEBUGTAG + " setState() " + mState
-					+ " -> " + state);
+			Log.i("System.out", SweetBlue.DEBUGTAG + " setState() " + mState + " -> " + state);
 
 		// Give the new state to the Handler so the UI Activity can update
-		mHandler.obtainMessage(SweetBlue.MESSAGE_STATE_CHANGE, state, -1)
-				.sendToTarget();
+		mHandler.obtainMessage(SweetBlue.MESSAGE_STATE_CHANGE, state, -1).sendToTarget();
 	}
 
 	/**
@@ -198,8 +195,7 @@ public class BluetoothChatService {
 	 * @param device
 	 *            The BluetoothDevice that has been connected
 	 */
-	public synchronized void connected(BluetoothSocket socket,
-			BluetoothDevice device) {
+	public synchronized void connected(BluetoothSocket socket, BluetoothDevice device) {
 		if (D)
 			Log.d(TAG, "connected");
 
@@ -323,8 +319,7 @@ public class BluetoothChatService {
 
 			// Create a new listening server socket
 			try {
-				tmp = mAdapter
-						.listenUsingRfcommWithServiceRecord(NAME, MY_UUID);
+				tmp = mAdapter.listenUsingRfcommWithServiceRecord(NAME, MY_UUID);
 			} catch (IOException e) {
 				Log.e(TAG, "listen() failed", e);
 			}
@@ -429,9 +424,7 @@ public class BluetoothChatService {
 				try {
 					mmSocket.close();
 				} catch (IOException e2) {
-					Log.e(TAG,
-							"unable to close() socket during connection failure",
-							e2);
+					Log.e(TAG, "unable to close() socket during connection failure", e2);
 				}
 				// Start the service over to restart listening mode
 				BluetoothChatService.this.start();
@@ -497,24 +490,25 @@ public class BluetoothChatService {
 					// Read from the InputStream
 					bytes = mmInStream.read(buffer);
 
-					/* For debugging purposes */
-					if (SweetBlue.DEBUG) {
-						StringBuilder in = new StringBuilder();
-						in.append("Reading buffer... ");
-						for (int b = 0; b < bytes; b++)
-							in.append(buffer[b]).append(",");
-						Log.i("System.out", SweetBlue.DEBUGTAG + in.toString());
+					if (bytes > 3) {
+						/* For debugging purposes */
+						if (SweetBlue.DEBUG) {
+							StringBuilder in = new StringBuilder();
+							in.append("Reading buffer... ");
+							for (int b = 0; b < bytes; b++)
+								in.append(buffer[b]).append(",");
+							Log.i("System.out", SweetBlue.DEBUGTAG + in.toString());
+						}
+
+						/* Parse the buffer */
+						parseReadBuffer(buffer, bytes);
+
+					} else {
+						if (SweetBlue.DEBUG)
+							Log.i("System.out", SweetBlue.DEBUGTAG
+									+ "Not enough bytes in stream, impossible package!");
 					}
 
-					/* Should maybe indicate how many bytes are read? */
-					byte[] data = parseReadBuffer(buffer, bytes);
-
-					/*
-					 * StringBuilder sb = new StringBuilder(); for( int i = 0; i
-					 * < buffer.length; i++ ) sb.append(buffer[i]).append(",");
-					 * 
-					 * Log.i("Reading from... ", sb.toString());
-					 */
 				} catch (IOException e) {
 					Log.e(TAG, "disconnected", e);
 					connectionLost();
@@ -538,18 +532,24 @@ public class BluetoothChatService {
 		private byte[] parseReadBuffer(byte[] buffer, int bytes) {
 			int headerstart = -1;
 
-			boolean failedheader = true;
-
 			/*
 			 * Find the foot print, [0xff][0xff], this marks the beginning of
 			 * the header
 			 */
 			for (int i = 0; i < bytes - 1; i++) {
-				headerstart = (buffer[i] == (byte) 0xff && buffer[i + 1] == (byte) 0xff) ? i
-						: -1;
+				headerstart = (buffer[i] == (byte) 0xff && buffer[i + 1] == (byte) 0xff) ? i : -1;
 
 				/* We found a possible package... */
 				if (headerstart != -1) {
+					if (SweetBlue.DEBUG)
+						Log.i("System.out", SweetBlue.DEBUGTAG + "Found header footprint!");
+
+					/* Footprint 1 */
+					byte footp1 = buffer[headerstart + 0];
+
+					/* Footprint 2 */
+					byte footp2 = buffer[headerstart + 1];
+
 					/* Get the board cmd */
 					byte cmd = buffer[headerstart + 2];
 
@@ -566,10 +566,10 @@ public class BluetoothChatService {
 					byte xx = buffer[headerstart + 6];
 
 					/* If read-error */
-					if (xx == (byte) 0xff) {
+					if (xx == 0xff) {
 						if (SweetBlue.DEBUG)
-							Log.i("processing.android.sweetblue",
-									SweetBlue.DEBUGTAG + "Failed value check!");
+							Log.i("processing.android.sweetblue", SweetBlue.DEBUGTAG
+									+ "Failed value check!");
 						continue;
 					}
 
@@ -585,65 +585,56 @@ public class BluetoothChatService {
 						calcchksum ^= buffer[headerstart + j];
 
 					if (readchksum != calcchksum) {
-
 						if (SweetBlue.DEBUG)
-							Log.i("processing.android.sweetblue",
-									SweetBlue.DEBUGTAG + "Failed checksum!");
+							Log.i("processing.android.sweetblue", SweetBlue.DEBUGTAG
+									+ "Failed checksum!");
 						continue;
 					} else {
-						/* Failed header? -- no! */
-						failedheader = false;
+						/* What are we reading - a ping or a response? */
+						if (cmd == (byte) 0x04) {
+							/* Arduino PING request */
+							/*
+							 * We'll send the values we read from the stream
+							 * back EXCEPT the chksum, we'll calculate that from
+							 * the read values instead.
+							 */
+							byte[] pingresponse = new byte[] { footp1, footp2, cmd, datalen,
+									arduinocmd, pin, xx, yy, calcchksum };
+							this.write(pingresponse);
+						} else {
+							/* Arduino RESPONSE */
 
-						/* Things should be OK here... let's return the package */
-						/*
-						 * BAH! we can't return here, that means we're not
-						 * parsing the rest of the buffer dude!
-						 */
-						/*
-						 * return new byte[] { buffer[headerstart],
-						 * buffer[headerstart + 1], buffer[headerstart + 2],
-						 * buffer[headerstart + 3], buffer[headerstart + 4],
-						 * buffer[headerstart + 5], buffer[headerstart + 6],
-						 * buffer[headerstart + 7], buffer[headerstart + 8] };
-						 */
+							/* SUCCESS !! - Send the pin & value to the activity */
+							Message msg = mHandler.obtainMessage(SweetBlue.MESSAGE_READ);
+							Bundle bundle = new Bundle();
+							/* Temporary, we're just sending the byte[] */
+							// bundle.putByteArray(SweetBlue.DATA_VALUE, data);
+							bundle.putIntArray(SweetBlue.DATA_VALUE, new int[] { pin,
+									(xx * 128 + yy) });
+							msg.setData(bundle);
+							mHandler.sendMessage(msg);
 
-						/* Assemble the package */
-						/*byte[] data = new byte[] { buffer[headerstart],
-								buffer[headerstart + 1],
-								buffer[headerstart + 2],
-								buffer[headerstart + 3],
-								buffer[headerstart + 4],
-								buffer[headerstart + 5],
-								buffer[headerstart + 6],
-								buffer[headerstart + 7],
-								buffer[headerstart + 8] };*/
+							if (SweetBlue.DEBUG) {
+								String arduinopkg = (byte) buffer[headerstart] + " "
+										+ (byte) buffer[headerstart + 1] + " "
+										+ (byte) buffer[headerstart + 2] + " "
+										+ (byte) buffer[headerstart + 3] + " "
+										+ (byte) buffer[headerstart + 4] + " "
+										+ (byte) buffer[headerstart + 5] + " "
+										+ (byte) buffer[headerstart + 6] + " "
+										+ (byte) buffer[headerstart + 7] + " "
+										+ (byte) buffer[headerstart + 8];
 
-						/* Send the package to the activity */
-						Message msg = mHandler
-								.obtainMessage(SweetBlue.MESSAGE_READ);
-						Bundle bundle = new Bundle();
-						/* Temporary, we're just sending the byte[] */
-						// bundle.putByteArray(SweetBlue.DATA_VALUE, data);
-						bundle.putIntArray(SweetBlue.DATA_VALUE, new int[] { pin,
-								(xx * 256 + yy) });
-						msg.setData(bundle);
-						mHandler.sendMessage(msg);
-
-						if (SweetBlue.DEBUG)
-							Log.i("System.out", SweetBlue.DEBUGTAG
-									+ "Found ArduinoBT package!");
+								Log.i("System.out", SweetBlue.DEBUGTAG
+										+ "Found ArduinoBT package! [" + arduinopkg + "]");
+							}
+						}
 					}
 				} else {
 					/* Failed finding header footprint */
-					// Log.i("processing.android", "Failed header footprint!");
+					if (SweetBlue.DEBUG)
+						Log.i("System.out", SweetBlue.DEBUGTAG + "Failed header footprint!");
 				}
-
-			}
-
-			if (failedheader) {
-				if (SweetBlue.DEBUG)
-					Log.i("System.out", SweetBlue.DEBUGTAG
-							+ "Failed header footprint!");
 			}
 
 			return null;
@@ -680,4 +671,5 @@ public class BluetoothChatService {
 			}
 		}
 	}
+
 }

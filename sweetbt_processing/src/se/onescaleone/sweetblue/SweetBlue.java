@@ -25,7 +25,33 @@
 
 package se.onescaleone.sweetblue;
 
+/*
+ *  Written by Andreas Göransson & David Cuartielles, 1scale1 Handelsbolag, 
+ *  for use in the project SweetBlue.
+ *  
+ *  SweetBlue: a library and communication protocol used to set Arduino 
+ *  states over bluetooth from an Android device. Effectively removing 
+ *  the need to program the Arduino chip.
+ *  
+ *  Copyright (C) 2011  1scale1 Handelsbolag
+ *
+ *  This file is part of SweetBlue.
+ *
+ *  SweetBlue is free software: you can redistribute it and/or modify
+ *  it under the terms of the GNU General Public License as published by
+ *  the Free Software Foundation, either version 3 of the License, or
+ *  (at your option) any later version.
+ *
+ *  SweetBlue is distributed in the hope that it will be useful,
+ *  but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *  GNU General Public License for more details.
+ *
+ *  You should have received a copy of the GNU General Public License
+ *  along with SweetBlue.  If not, see <http://www.gnu.org/licenses/>.
+ */
 import java.util.HashMap;
+import java.util.TimerTask;
 
 import processing.core.PApplet;
 import android.bluetooth.BluetoothAdapter;
@@ -94,6 +120,9 @@ public class SweetBlue {
 	/* Map containing all pins and their read-values */
 	private HashMap<Integer, Integer> values;
 
+	/* The syncing - used to determine if the arduino is disconnected */
+	private TimerTask syncer;
+
 	/**
 	 * a Constructor, usually called in the setup() method in your sketch to
 	 * initialize and start the library.
@@ -155,14 +184,12 @@ public class SweetBlue {
 									break;
 								case MESSAGE_DEVICE_NAME:
 									// Print the connected device name to PDE
-									PApplet.println(msg.getData().getString(
-											DEVICE_NAME)
+									PApplet.println(msg.getData().getString(DEVICE_NAME)
 											+ " connected.");
 									break;
 								case MESSAGE_READ:
 									// Read from the output stream... byte[]
-									int[] data = msg.getData().getIntArray(
-											DATA_VALUE);
+									int[] data = msg.getData().getIntArray(DATA_VALUE);
 
 									/* Add the value to the hashmap */
 									if (data != null && values != null)
@@ -173,10 +200,8 @@ public class SweetBlue {
 										StringBuffer sb = new StringBuffer();
 										for (int i = 0; i < data.length; i++)
 											sb.append(data[i]).append(",");
-										Log.i("System.out",
-												SweetBlue.DEBUGTAG
-														+ "ArduinoBT package: "
-														+ sb.toString());
+										Log.i("System.out", SweetBlue.DEBUGTAG
+												+ "ArduinoBT package: " + sb.toString());
 									} else if (SweetBlue.DEBUG && data == null) {
 										Log.i("System.out", SweetBlue.DEBUGTAG
 												+ "Read data is null!");
@@ -191,8 +216,7 @@ public class SweetBlue {
 						mChatService = new BluetoothChatService(recieveHandler);
 
 					// Connect the chatservice
-					mChatService.connect(BluetoothAdapter.getDefaultAdapter()
-							.getRemoteDevice(mac));
+					mChatService.connect(BluetoothAdapter.getDefaultAdapter().getRemoteDevice(mac));
 
 					// Add the listener
 				}
@@ -202,8 +226,7 @@ public class SweetBlue {
 	}
 
 	public boolean isConnected() {
-		if (mChatService != null
-				&& mChatService.getState() == BluetoothChatService.STATE_CONNECTED)
+		if (mChatService != null && mChatService.getState() == BluetoothChatService.STATE_CONNECTED)
 			return true;
 		else
 			return false;
@@ -231,29 +254,7 @@ public class SweetBlue {
 	 * 
 	 * @param data
 	 */
-	public byte[] write(byte value) {
-		if (!this.isCurrentlySendingData()) {
-
-			byte[] data = new byte[1];
-			data[0] = value;
-
-			mChatService.write(attachHeaderBytes(data));
-
-			return data;
-		}
-
-		return null;
-	}
-
-	/**
-	 * DEPRECATED
-	 * 
-	 * Tries to write data to the bluetooth port.
-	 * 
-	 * byte[]
-	 * 
-	 * @param data
-	 */
+	@Deprecated
 	public byte[] write(byte[] value) {
 		if (!this.isCurrentlySendingData()) {
 			mChatService.write(attachHeaderBytes(value));
@@ -261,32 +262,6 @@ public class SweetBlue {
 			return value;
 		}
 
-		return null;
-	}
-
-	/**
-	 * DEPRECATED
-	 * 
-	 * Tries to write data to the bluetooth port.
-	 * 
-	 * int
-	 * 
-	 * @param data
-	 */
-	@Deprecated
-	public byte[] write(int value) {
-		if (!this.isCurrentlySendingData()) {
-			byte[] data = new byte[4];
-
-			for (int i = 0; i < 4; i++) {
-				int offset = (data.length - 1 - i) * 8;
-				data[i] = (byte) ((value >>> offset) & 0xFF);
-			}
-
-			mChatService.write(attachHeaderBytes(data));
-
-			return data;
-		}
 		return null;
 	}
 
@@ -336,12 +311,10 @@ public class SweetBlue {
 	public byte[] pinMode(final int pin, int mode) {
 		switch (mode) {
 		case INPUT:
-			mChatService.write(assemblePackage((byte) pin, (byte) 0x01,
-					(byte) 0x00));
+			mChatService.write(assemblePackage((byte) pin, (byte) 0x01, (byte) 0x00));
 			break;
 		case OUTPUT:
-			mChatService.write(assemblePackage((byte) pin, (byte) 0x01,
-					(byte) 0x01));
+			mChatService.write(assemblePackage((byte) pin, (byte) 0x01, (byte) 0x01));
 		}
 		return null;
 	}
@@ -357,8 +330,7 @@ public class SweetBlue {
 	 *            HIGH or LOW
 	 */
 	public void digitalWrite(final int pin, int value) {
-		mChatService.write(assemblePackage((byte) pin, (byte) 0x03,
-				(byte) value));
+		mChatService.write(assemblePackage((byte) pin, (byte) 0x03, (byte) value));
 	}
 
 	/**
@@ -368,14 +340,12 @@ public class SweetBlue {
 	 * @param variable
 	 */
 	public void digitalRead(int pin, int[] variable) {
-		mChatService
-				.write(assemblePackage((byte) pin, (byte) 0x02, (byte) 0x00));
-		
+		mChatService.write(assemblePackage((byte) pin, (byte) 0x02, (byte) 0x00));
+
 		if (values.containsKey(pin))
 			variable[0] = values.get(pin);
 		else if (SweetBlue.DEBUG)
-			Log.i("System.out", SweetBlue.DEBUGTAG + "No value exists on pin "
-					+ pin);
+			Log.i("System.out", SweetBlue.DEBUGTAG + "No value exists on pin " + pin);
 	}
 
 	/**
@@ -390,11 +360,9 @@ public class SweetBlue {
 	 */
 	public void analogWrite(final int pin, int value) {
 		if (value >= 0 && value <= 255)
-			mChatService.write(assemblePackage((byte) pin, (byte) 0x03,
-					(byte) value));
+			mChatService.write(assemblePackage((byte) pin, (byte) 0x05, (byte) value));
 		else
-			Log.i("System.out", SweetBlue.DEBUGTAG
-					+ "Bad value on analogWrite!");
+			Log.i("System.out", SweetBlue.DEBUGTAG + "Bad value on analogWrite!");
 	}
 
 	/**
@@ -402,7 +370,7 @@ public class SweetBlue {
 	 * 
 	 * IMPORTANT! To "fix" the issue of pass-by-value on primitives, we need the
 	 * variable to be non-primitive. An array will do fine for solving this
-	 * initially.
+	 * initially...
 	 * 
 	 * @param pin
 	 *            The pin number to read
@@ -410,14 +378,34 @@ public class SweetBlue {
 	 *            variable to which the reading should be written.
 	 */
 	public void analogRead(int pin, int[] variable) {
-		mChatService
-				.write(assemblePackage((byte) pin, (byte) 0x02, (byte) 0x00));
+		mChatService.write(assemblePackage((byte) pin, (byte) 0x04, (byte) 0x00));
 
 		if (values.containsKey(pin))
 			variable[0] = values.get(pin);
 		else if (SweetBlue.DEBUG)
-			Log.i("System.out", SweetBlue.DEBUGTAG + "No value exists on pin "
-					+ pin);
+			Log.i("System.out", SweetBlue.DEBUGTAG + "No value exists on pin " + pin);
+	}
+
+	/**
+	 * Sends the close command to Arduino, so it knows to reset the
+	 * BluetoothChip. This should allways be called in the "onStop" method in
+	 * the sketch.
+	 */
+	public void close() {
+		/* Sending the main cmd 0x05 will make the Arduino reset it's state */
+		mChatService.write(assemblePackage((byte) 0x05, (byte) 0x00, (byte) 0x00, (byte) 0x00));
+	}
+
+	/**
+	 * Used by the standard functions to send state to the arduino.
+	 * 
+	 * @param pin
+	 * @param cmd
+	 * @param val
+	 * @return
+	 */
+	private byte[] assemblePackage(byte pin, byte cmd, byte val) {
+		return this.assemblePackage((byte) 0x02, pin, cmd, val);
 	}
 
 	/**
@@ -427,7 +415,7 @@ public class SweetBlue {
 	 * @param cmd
 	 * @param val
 	 */
-	private byte[] assemblePackage(byte pin, byte cmd, byte val) {
+	private byte[] assemblePackage(byte cmd, byte pin, byte arduinocmd, byte val) {
 		/* Header */
 		// [FP][FP][cmd][len][arduinocmd][pin][val][chksum]
 
@@ -439,7 +427,8 @@ public class SweetBlue {
 		buffer[1] = (byte) 0xff;
 
 		/* Main command - 0x02 right now */
-		buffer[2] = (byte) 0x02;
+		// buffer[2] = (byte) 0x02;
+		buffer[2] = (byte) cmd;
 
 		/* Length, it's always the same size... for now */
 		buffer[3] = (byte) 0x03;
@@ -493,7 +482,7 @@ public class SweetBlue {
 			checksum ^= in[i];
 
 		/* Data fix, making sure we won't have two 0xff in a row */
-		// Removed because it caused issues...
+		// !! Causes issues... we're not really using this anymore
 		// for (int i = 1; i < in.length; i += 2)
 		// in[i] |= 0x80;
 
