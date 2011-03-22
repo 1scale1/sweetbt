@@ -51,7 +51,6 @@ package se.onescaleone.sweetblue;
  *  along with SweetBlue.  If not, see <http://www.gnu.org/licenses/>.
  */
 import java.util.HashMap;
-import java.util.TimerTask;
 
 import processing.core.PApplet;
 import android.bluetooth.BluetoothAdapter;
@@ -120,9 +119,6 @@ public class SweetBlue {
 	/* Map containing all pins and their read-values */
 	private HashMap<Integer, Integer> values;
 
-	/* The syncing - used to determine if the arduino is disconnected */
-	private TimerTask syncer;
-
 	/**
 	 * a Constructor, usually called in the setup() method in your sketch to
 	 * initialize and start the library.
@@ -136,6 +132,16 @@ public class SweetBlue {
 
 		/* Init hashmap, has only 16 spaces now though */
 		values = new HashMap<Integer, Integer>();
+	}
+
+	/**
+	 * Set all your pinmodes in this function inside Processing. The library
+	 * will call this automatically.
+	 */
+	public void pinModes() {
+		if (SweetBlue.DEBUG)
+			Log.i("System.out", SweetBlue.DEBUGTAG + "Attempting to set pin modes");
+		/* Add your pinModes in here */
 	}
 
 	/**
@@ -169,6 +175,8 @@ public class SweetBlue {
 
 									switch (msg.arg1) {
 									case BluetoothChatService.STATE_CONNECTED:
+										/* Do the pinmodes */
+										pinModes();
 										state = STATE_CONNECTED;
 										break;
 									case BluetoothChatService.STATE_CONNECTING:
@@ -216,9 +224,10 @@ public class SweetBlue {
 						mChatService = new BluetoothChatService(recieveHandler);
 
 					// Connect the chatservice
-					mChatService.connect(BluetoothAdapter.getDefaultAdapter().getRemoteDevice(mac));
+					mChatService.connect(BluetoothAdapter.getDefaultAdapter()
+							.getRemoteDevice(mac));
 
-					// Add the listener
+					// Add the listener??
 				}
 			});
 
@@ -226,7 +235,8 @@ public class SweetBlue {
 	}
 
 	public boolean isConnected() {
-		if (mChatService != null && mChatService.getState() == BluetoothChatService.STATE_CONNECTED)
+		if (mChatService != null
+				&& mChatService.getState() == BluetoothChatService.STATE_CONNECTED)
 			return true;
 		else
 			return false;
@@ -258,7 +268,6 @@ public class SweetBlue {
 	public byte[] write(byte[] value) {
 		if (!this.isCurrentlySendingData()) {
 			mChatService.write(attachHeaderBytes(value));
-
 			return value;
 		}
 
@@ -266,6 +275,8 @@ public class SweetBlue {
 	}
 
 	/**
+	 * Used to determine if we're sending data or not... don't use this
+	 * yourself!
 	 * 
 	 * @return
 	 */
@@ -310,10 +321,10 @@ public class SweetBlue {
 	 */
 	public byte[] pinMode(final int pin, int mode) {
 		switch (mode) {
-		case INPUT:
+		case OUTPUT:
 			mChatService.write(assemblePackage((byte) pin, (byte) 0x01, (byte) 0x00));
 			break;
-		case OUTPUT:
+		case INPUT:
 			mChatService.write(assemblePackage((byte) pin, (byte) 0x01, (byte) 0x01));
 		}
 		return null;
@@ -392,8 +403,12 @@ public class SweetBlue {
 	 * the sketch.
 	 */
 	public void close() {
+		if (SweetBlue.DEBUG)
+			Log.i("System.out", SweetBlue.DEBUGTAG + "Sending disconnect signal!");
+
 		/* Sending the main cmd 0x05 will make the Arduino reset it's state */
-		mChatService.write(assemblePackage((byte) 0x05, (byte) 0x00, (byte) 0x00, (byte) 0x00));
+		mChatService.write(assemblePackage((byte) 0x05, (byte) 0x00, (byte) 0x00,
+				(byte) 0x00));
 	}
 
 	/**
@@ -434,7 +449,7 @@ public class SweetBlue {
 		buffer[3] = (byte) 0x03;
 
 		/* Arduino command - pinmode, digitalwrite, analogread... etc */
-		buffer[4] = cmd;
+		buffer[4] = arduinocmd;
 
 		/* The pin on which to act */
 		buffer[5] = pin;
@@ -443,7 +458,7 @@ public class SweetBlue {
 		buffer[6] = val;
 
 		/* The checksum - cmd ^ len ^ arduinocmd ^ pin ^ val */
-		buffer[7] = (byte) ((((buffer[2] ^ buffer[3]) ^ cmd) ^ pin) ^ val);
+		buffer[7] = (byte) ((((buffer[2] ^ buffer[3]) ^ arduinocmd) ^ pin) ^ val);
 
 		return buffer;
 	}

@@ -70,7 +70,8 @@ public class BluetoothChatService {
 	private static final String NAME = "BluetoothChat";
 
 	// Unique UUID for this application
-	private static final UUID MY_UUID = UUID.fromString("00001101-0000-1000-8000-00805F9B34FB");
+	private static final UUID MY_UUID = UUID
+			.fromString("00001101-0000-1000-8000-00805F9B34FB");
 
 	// Member fields
 	private final BluetoothAdapter mAdapter;
@@ -116,7 +117,8 @@ public class BluetoothChatService {
 		mState = state;
 
 		if (SweetBlue.DEBUG)
-			Log.i("System.out", SweetBlue.DEBUGTAG + " setState() " + mState + " -> " + state);
+			Log.i("System.out", SweetBlue.DEBUGTAG + " setState() " + mState + " -> "
+					+ state);
 
 		// Give the new state to the Handler so the UI Activity can update
 		mHandler.obtainMessage(SweetBlue.MESSAGE_STATE_CHANGE, state, -1).sendToTarget();
@@ -476,11 +478,35 @@ public class BluetoothChatService {
 			mmOutStream = tmpOut;
 		}
 
+		// TODO fix.
+		/* This isn't very pretty, but will do for now... */
+		int startindex = -1;
+		int endindex = -1;
+		byte[] storedbuffer = null;
+		byte[] readbuffer = null;
+
 		@Override
 		public void run() {
 			Log.i(TAG, "BEGIN mConnectedThread");
-			byte[] buffer = new byte[1024];
+			byte[] buffer;
 			int bytes;
+
+			/*
+			 * We had an issue here that the buffer was being split up in two
+			 * pieces... and that caused a lot of issues in the communication in
+			 * the form of lost packages
+			 * 
+			 * [S E N T - P A C K A G E -------------->]
+			 * 
+			 * [READ BUFFER 1----->] (Not sufficient on it's own!)
+			 * 
+			 * [READ BUFFER 2 ------>] (Not sufficient on it's own!)
+			 * 
+			 * So, we're adding these two together to form a bigger buffer, and
+			 * then parse that buffer as one.
+			 * 
+			 * [READ BUFFER 1----->][READ BUFFER 2 ------>] (Sufficient!)
+			 */
 
 			// Keep listening to the InputStream while connected
 			while (true) {
@@ -490,19 +516,48 @@ public class BluetoothChatService {
 					// Read from the InputStream
 					bytes = mmInStream.read(buffer);
 
-					if (bytes > 3) {
+					if (bytes < 9 && storedbuffer == null) {
+						/*
+						 * if bytes is less than 9... just copy the buffer and
+						 * attach it before the next buffer
+						 */
+						storedbuffer = new byte[bytes];
+
+						for (int i = 0; i < storedbuffer.length; i++)
+							storedbuffer[i] = buffer[i];
+					} else if (storedbuffer != null) {
+						/* If we have something in "storedbuffer" use it! */
+						readbuffer = new byte[bytes + storedbuffer.length];
+						int index = 0;
+
+						for (int i = 0; i < storedbuffer.length; i++, index++)
+							readbuffer[index] = storedbuffer[i];
+						for (int j = 0; j < bytes; j++, index++)
+							readbuffer[index] = buffer[j];
+					} else if (bytes >= 9) {
+						readbuffer = new byte[bytes];
+						for (int i = 0; i < bytes; i++)
+							readbuffer[i] = buffer[i];
+					}
+
+					/* Do parsing on readbuffer */
+					if (readbuffer != null) {
 						/* For debugging purposes */
 						if (SweetBlue.DEBUG) {
 							StringBuilder in = new StringBuilder();
 							in.append("Reading buffer... ");
 							for (int b = 0; b < bytes; b++)
-								in.append(buffer[b]).append(",");
+								in.append(readbuffer[b]).append(",");
 							Log.i("System.out", SweetBlue.DEBUGTAG + in.toString());
 						}
 
 						/* Parse the buffer */
-						parseReadBuffer(buffer, bytes);
+						parseReadBuffer(readbuffer, bytes);
 
+						/* And after parsing it, "kill it" */
+						readbuffer = null;
+						storedbuffer = null;
+						buffer = null;
 					} else {
 						if (SweetBlue.DEBUG)
 							Log.i("System.out", SweetBlue.DEBUGTAG
@@ -537,12 +592,14 @@ public class BluetoothChatService {
 			 * the header
 			 */
 			for (int i = 0; i < bytes - 1; i++) {
-				headerstart = (buffer[i] == (byte) 0xff && buffer[i + 1] == (byte) 0xff) ? i : -1;
+				headerstart = (buffer[i] == (byte) 0xff && buffer[i + 1] == (byte) 0xff) ? i
+						: -1;
 
 				/* We found a possible package... */
 				if (headerstart != -1) {
 					if (SweetBlue.DEBUG)
-						Log.i("System.out", SweetBlue.DEBUGTAG + "Found header footprint!");
+						Log.i("System.out", SweetBlue.DEBUGTAG
+								+ "Found header footprint!");
 
 					/* Footprint 1 */
 					byte footp1 = buffer[headerstart + 0];
@@ -568,7 +625,7 @@ public class BluetoothChatService {
 					/* If read-error */
 					if (xx == 0xff) {
 						if (SweetBlue.DEBUG)
-							Log.i("processing.android.sweetblue", SweetBlue.DEBUGTAG
+							Log.i("System.out", SweetBlue.DEBUGTAG
 									+ "Failed value check!");
 						continue;
 					}
@@ -586,20 +643,23 @@ public class BluetoothChatService {
 
 					if (readchksum != calcchksum) {
 						if (SweetBlue.DEBUG)
-							Log.i("processing.android.sweetblue", SweetBlue.DEBUGTAG
-									+ "Failed checksum!");
+							Log.i("System.out", SweetBlue.DEBUGTAG + "Failed checksum!");
 						continue;
 					} else {
 						/* What are we reading - a ping or a response? */
 						if (cmd == (byte) 0x04) {
 							/* Arduino PING request */
+							if (SweetBlue.DEBUG) {
+								Log.i("System.out", SweetBlue.DEBUGTAG
+										+ "Recieved PING request, attempting to reply!");
+							}
 							/*
 							 * We'll send the values we read from the stream
 							 * back EXCEPT the chksum, we'll calculate that from
 							 * the read values instead.
 							 */
-							byte[] pingresponse = new byte[] { footp1, footp2, cmd, datalen,
-									arduinocmd, pin, xx, yy, calcchksum };
+							byte[] pingresponse = new byte[] { footp1, footp2, cmd,
+									datalen, arduinocmd, pin, xx, yy, calcchksum };
 							this.write(pingresponse);
 						} else {
 							/* Arduino RESPONSE */
@@ -633,7 +693,8 @@ public class BluetoothChatService {
 				} else {
 					/* Failed finding header footprint */
 					if (SweetBlue.DEBUG)
-						Log.i("System.out", SweetBlue.DEBUGTAG + "Failed header footprint!");
+						Log.i("System.out", SweetBlue.DEBUGTAG
+								+ "Failed header footprint!");
 				}
 			}
 
