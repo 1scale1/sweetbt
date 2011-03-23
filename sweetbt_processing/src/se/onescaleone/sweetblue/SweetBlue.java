@@ -50,6 +50,8 @@ package se.onescaleone.sweetblue;
  *  You should have received a copy of the GNU General Public License
  *  along with SweetBlue.  If not, see <http://www.gnu.org/licenses/>.
  */
+import java.awt.event.ActionEvent;
+import java.lang.reflect.Method;
 import java.util.HashMap;
 
 import processing.core.PApplet;
@@ -90,7 +92,8 @@ public class SweetBlue {
 	private int state = -1;
 	public static final int STATE_CONNECTED = 18;
 	public static final int STATE_DISCONNECTED = 28;
-
+	public static final int STATE_CONNECTING = 38;
+	
 	/* Link to the applications main handler */
 	private Handler mainHandler;
 	private Handler recieveHandler;
@@ -129,19 +132,34 @@ public class SweetBlue {
 	public SweetBlue(PApplet theParent) {
 		myParent = theParent;
 		welcome();
-
 		/* Init hashmap, has only 16 spaces now though */
 		values = new HashMap<Integer, Integer>();
+		
+		/*
+		 * Add the listener to the parent, this should force the sketch to
+		 * implement the method...
+		 */
+		/*try {
+			Method m = myParent.getClass().getMethod("SweetBlueConnected", new Class[] { SweetBlueEvent.class });
+			this.addSweetBlueListener(new GenericListener(this, m));
+		} catch (SecurityException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} catch (NoSuchMethodException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}*/
+
 	}
 
 	/**
 	 * Set all your pinmodes in this function inside Processing. The library
 	 * will call this automatically.
 	 */
-	public void pinModes() {
+	public void callPinModes() {
 		if (SweetBlue.DEBUG)
 			Log.i("System.out", SweetBlue.DEBUGTAG + "Attempting to set pin modes");
-		/* Add your pinModes in here */
+
 	}
 
 	/**
@@ -175,17 +193,23 @@ public class SweetBlue {
 
 									switch (msg.arg1) {
 									case BluetoothChatService.STATE_CONNECTED:
-										/* Do the pinmodes */
-										pinModes();
+										/* Dispatch the connected event */
+										//dispatchConnectedEvent(new SweetBlueEvent(SweetBlue.this, true));
 										state = STATE_CONNECTED;
 										break;
 									case BluetoothChatService.STATE_CONNECTING:
-										state = STATE_DISCONNECTED;
+										/* Dispatch the connected event */
+										//dispatchConnectedEvent(new SweetBlueEvent(SweetBlue.this, false));
+										state = STATE_CONNECTING;
 										break;
 									case BluetoothChatService.STATE_LISTEN:
-										state = STATE_DISCONNECTED;
+										/* Dispatch the connected event */
+										//dispatchConnectedEvent(new SweetBlueEvent(SweetBlue.this, false));
+										state = STATE_CONNECTING;
 										break;
 									case BluetoothChatService.STATE_NONE:
+										/* Dispatch the connected event */
+										//dispatchConnectedEvent(new SweetBlueEvent(SweetBlue.this, false));
 										state = STATE_DISCONNECTED;
 										break;
 									}
@@ -514,5 +538,46 @@ public class SweetBlue {
 		outdata[outdata.length - 1] = checksum;
 
 		return outdata;
+	}
+
+	/* ===== EVENT OBJECTS ===== */
+	/**
+	 * List of event listeners.
+	 */
+	protected EventListenerList listenerList = new EventListenerList();
+
+	/**
+	 * Add a new EssemmessListener to the list.
+	 * 
+	 * @param listener
+	 */
+	public void addSweetBlueListener(SweetBlueListener listener) {
+		listenerList.add(SweetBlueListener.class, listener);
+	}
+
+	/**
+	 * Remove the selected EssemmessListener from the list.
+	 * 
+	 * @param listener
+	 */
+	public void removeSweetBlueListener(SweetBlueListener listener) {
+		listenerList.remove(SweetBlueListener.class, listener);
+	}
+
+	/**
+	 * Dispatches a new READ event, this is dispatched when the HttpWorker has
+	 * executed a READ action on the Essemmess server.
+	 * 
+	 * @param evt
+	 */
+	void dispatchConnectedEvent(SweetBlueEvent evt) {
+		Object[] listeners = listenerList.getListenerList();
+		// Each listener occupies two elements - the first is the listener class
+		// and the second is the listener instance
+		for (int i = 0; i < listeners.length; i += 2) {
+			if (listeners[i] == SweetBlueEvent.class) {
+				((SweetBlueListener) listeners[i + 1]).SweetBlueConnected(evt);
+			}
+		}
 	}
 }

@@ -478,10 +478,8 @@ public class BluetoothChatService {
 			mmOutStream = tmpOut;
 		}
 
-		// TODO fix.
+		// TODO fix?
 		/* This isn't very pretty, but will do for now... */
-		int startindex = -1;
-		int endindex = -1;
 		byte[] storedbuffer = null;
 		byte[] readbuffer = null;
 
@@ -546,15 +544,15 @@ public class BluetoothChatService {
 						if (SweetBlue.DEBUG) {
 							StringBuilder in = new StringBuilder();
 							in.append("Reading buffer... ");
-							for (int b = 0; b < bytes; b++)
+							for (int b = 0; b < readbuffer.length; b++)
 								in.append(readbuffer[b]).append(",");
 							Log.i("System.out", SweetBlue.DEBUGTAG + in.toString());
 						}
 
 						/* Parse the buffer */
-						parseReadBuffer(readbuffer, bytes);
+						parseReadBuffer(readbuffer, readbuffer.length);
 
-						/* And after parsing it, "kill it" */
+						/* And after parsing the buffer/s, kill them */
 						readbuffer = null;
 						storedbuffer = null;
 						buffer = null;
@@ -646,9 +644,8 @@ public class BluetoothChatService {
 							Log.i("System.out", SweetBlue.DEBUGTAG + "Failed checksum!");
 						continue;
 					} else {
-						/* What are we reading - a ping or a response? */
-						if (cmd == (byte) 0x04) {
-							/* Arduino PING request */
+						if (cmd == (byte) 0x08) {
+							/* PING Request */
 							if (SweetBlue.DEBUG) {
 								Log.i("System.out", SweetBlue.DEBUGTAG
 										+ "Recieved PING request, attempting to reply!");
@@ -661,19 +658,8 @@ public class BluetoothChatService {
 							byte[] pingresponse = new byte[] { footp1, footp2, cmd,
 									datalen, arduinocmd, pin, xx, yy, calcchksum };
 							this.write(pingresponse);
-						} else {
-							/* Arduino RESPONSE */
-
-							/* SUCCESS !! - Send the pin & value to the activity */
-							Message msg = mHandler.obtainMessage(SweetBlue.MESSAGE_READ);
-							Bundle bundle = new Bundle();
-							/* Temporary, we're just sending the byte[] */
-							// bundle.putByteArray(SweetBlue.DATA_VALUE, data);
-							bundle.putIntArray(SweetBlue.DATA_VALUE, new int[] { pin,
-									(xx * 128 + yy) });
-							msg.setData(bundle);
-							mHandler.sendMessage(msg);
-
+						} else if (cmd == (byte) 0x02) {
+							/* Value RESPONSE */
 							if (SweetBlue.DEBUG) {
 								String arduinopkg = (byte) buffer[headerstart] + " "
 										+ (byte) buffer[headerstart + 1] + " "
@@ -688,6 +674,16 @@ public class BluetoothChatService {
 								Log.i("System.out", SweetBlue.DEBUGTAG
 										+ "Found ArduinoBT package! [" + arduinopkg + "]");
 							}
+
+							/* SUCCESS !! - Send the pin & value to the activity */
+							Message msg = mHandler.obtainMessage(SweetBlue.MESSAGE_READ);
+							Bundle bundle = new Bundle();
+							/* Temporary, we're just sending the byte[] */
+							// bundle.putByteArray(SweetBlue.DATA_VALUE, data);
+							bundle.putIntArray(SweetBlue.DATA_VALUE, new int[] { pin,
+									(xx * 128 + yy) });
+							msg.setData(bundle);
+							mHandler.sendMessage(msg);						
 						}
 					}
 				} else {
