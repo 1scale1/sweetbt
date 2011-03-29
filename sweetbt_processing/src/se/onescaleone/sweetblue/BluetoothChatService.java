@@ -480,8 +480,8 @@ public class BluetoothChatService {
 
 		// TODO fix?
 		/* This isn't very pretty, but will do for now... */
-		byte[] storedbuffer = null;
-		byte[] readbuffer = null;
+		volatile byte[] storedbuffer = null;
+		volatile byte[] readbuffer = null;
 
 		@Override
 		public void run() {
@@ -539,7 +539,7 @@ public class BluetoothChatService {
 					}
 
 					/* Do parsing on readbuffer */
-					if (readbuffer != null) {
+					if (readbuffer != null && readbuffer.length >= 9) {
 						/* For debugging purposes */
 						if (SweetBlue.DEBUG) {
 							StringBuilder in = new StringBuilder();
@@ -549,13 +549,22 @@ public class BluetoothChatService {
 							Log.i("System.out", SweetBlue.DEBUGTAG + in.toString());
 						}
 
-						/* Parse the buffer */
-						parseReadBuffer(readbuffer, readbuffer.length);
-
-						/* And after parsing the buffer/s, kill them */
-						readbuffer = null;
-						storedbuffer = null;
-						buffer = null;
+						if (readbuffer != null) {
+							/* Parse the buffer */
+							try {
+								parseReadBuffer(readbuffer, readbuffer.length);
+							} catch (Exception e) {
+								if (SweetBlue.DEBUG) {
+									Log.i("System.out",
+											SweetBlue.DEBUGTAG
+													+ "Exception found! Something went wrong when reading the package! " + e.getMessage());
+								}
+							}
+							/* And after parsing the buffer/s, kill them */
+							readbuffer = null;
+							storedbuffer = null;
+							buffer = null;
+						}
 					} else {
 						if (SweetBlue.DEBUG)
 							Log.i("System.out", SweetBlue.DEBUGTAG
@@ -683,14 +692,15 @@ public class BluetoothChatService {
 							bundle.putIntArray(SweetBlue.DATA_VALUE, new int[] { pin,
 									(xx * 128 + yy) });
 							msg.setData(bundle);
-							mHandler.sendMessage(msg);						
+							mHandler.sendMessage(msg);
 						}
 					}
 				} else {
 					/* Failed finding header footprint */
-					if (SweetBlue.DEBUG)
-						Log.i("System.out", SweetBlue.DEBUGTAG
-								+ "Failed header footprint!");
+					/*
+					 * if (SweetBlue.DEBUG) Log.i("System.out",
+					 * SweetBlue.DEBUGTAG + "Failed header footprint!");
+					 */
 				}
 			}
 

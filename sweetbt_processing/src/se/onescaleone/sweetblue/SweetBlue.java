@@ -50,8 +50,6 @@ package se.onescaleone.sweetblue;
  *  You should have received a copy of the GNU General Public License
  *  along with SweetBlue.  If not, see <http://www.gnu.org/licenses/>.
  */
-import java.awt.event.ActionEvent;
-import java.lang.reflect.Method;
 import java.util.HashMap;
 
 import processing.core.PApplet;
