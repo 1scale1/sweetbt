@@ -11,11 +11,18 @@
 
 import se.onescaleone.sweetblue.*;
 
-
 /* Library obj. */
 SweetBlue bt;
 
-/* Processing UI */
+/* Related to the communication */
+boolean initiated = false;
+long timer = 0;
+long timerdelay = 100; // minimum amount of milliseconds between each reading
+
+/* Pin where the sensor is connected */
+int PIN = 0;
+
+/* Slider UI */
 int[] pos = new int[] { 
   0, 400
 };
@@ -24,32 +31,28 @@ int[] dim = new int[] {
 };
 boolean sliding = false;
 
-long timer = 0;
 
 void setup() {
   /* Connect to the ArduinoBT */
   if ( bt == null ) {
     bt = new SweetBlue( this );
-     bt.connect( "00:07:80:82:1E:BC"/* ArduinoBT MAC */    );
+     bt.connect( /* ArduinoBT MAC */ );
   }
 
   /* Lock PORTRAIT view */
   orientation( PORTRAIT );
-  
-  SweetBlue.DEBUG = true;
+
+  /* Enable debug messages? */
+  //SweetBlue.DEBUG = true;
+
+  //timer = millis();
 }
-boolean initiated = false;
 
 void draw() {
-  if ( bt.isConnected() && !initiated ) {
-    bt.pinMode( 11, SweetBlue.OUTPUT );
-    initiated = true;
-    timer = millis();
-  }
+  /* Draw the background */
+  background( 126 );
 
-  background( 160 );
-
-  /* Draw UI */
+  /* Draw Slider UI */
   fill( (sliding ? 0 : 255 ) );
   rect( pos[0], pos[1], dim[0], dim[1] );
 }
@@ -63,18 +66,19 @@ boolean surfaceTouchEvent( MotionEvent event ) {
         (event.getY() > pos[1] && event.getY() < (pos[1] + dim[1])) ) {
         /* Selected, set sliding to true */
         sliding = true;
-        bt.pinMode( 11, SweetBlue.OUTPUT );
+        bt.pinMode( PIN, SweetBlue.OUTPUT );
       }
     }
     else if ( event.getAction() == MotionEvent.ACTION_MOVE ) {
       if ( sliding ) {
         /* Set slider value */
         pos[0] = constrain( (int)event.getX(), 50, screenWidth - 50 );
-        
-        /* Send to bluetooth */
-        if( millis() - timer > 50 ){
+
+        /* Send to bluetooth, but only if enough time has passed */
+        if ( millis() - timer >= timerdelay ) {
+          bt.analogWrite( PIN, (int)map(pos[0], 50, screenWidth - 50, 0, 255) );
+          /* Reset timer */
           timer = millis();
-          bt.analogWrite( 11, (int)map(pos[0], 50, screenWidth - 50, 0, 255) );
         }
       }
     }
@@ -82,9 +86,8 @@ boolean surfaceTouchEvent( MotionEvent event ) {
       /* Stop sliding */
       sliding = false;
       
-      
-     // bt.digitalWrite( 11, 0 );
-      bt.pinMode( 11, SweetBlue.INPUT );
+      /* Reset the pinmode */
+      bt.pinMode( PIN, SweetBlue.INPUT );
     }
   }
   return super.surfaceTouchEvent( event );
