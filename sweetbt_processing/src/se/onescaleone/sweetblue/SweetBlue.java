@@ -76,7 +76,7 @@ public class SweetBlue {
 
 	// myParent is a reference to the parent sketch
 	PApplet myParent;
-
+//test
 	public final static String VERSION = "##version##";
 
 	/* Contains threads to control the communication */
