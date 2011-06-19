@@ -1,4 +1,4 @@
-/**
+﻿/**
  * you can put a one sentence description of your library here.
  *
  * ##copyright##
@@ -74,6 +74,7 @@ import android.util.Log;
 
 public class SweetBlue {
 
+// hej
 	// myParent is a reference to the parent sketch
 	PApplet myParent;
 //test
