@@ -1,6 +1,7 @@
 /*
  * SWEET GLUE
  *
+ * no_glue version
  * /
 
 SWEET is the name of a Processing library that instantiates basic Arduino commands and sends them up to an Arduino BT over the air. It requires the Arduino BT board to be ready to listen to the communication. The first version is made for the Arduino BT to become communication master what will allow the creation of localized wireless information points that could be accessed with BT enabled devices.
