@@ -26,7 +26,7 @@ void setup() {
 void draw() {
   /* UI - Bluetooth state */
   if ( bt != null ) {
-    if ( bt.getState() == BluetoothChatService.STATE_CONNECTED ) {
+    if ( bt.getState() == SweetBlue.STATE_CONNECTED ) {
       fill( 0, 255, 0 );
     } 
     else {
