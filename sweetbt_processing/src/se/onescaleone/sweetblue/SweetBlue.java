@@ -28,6 +28,7 @@ package se.onescaleone.sweetblue;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.net.Socket;
 import java.util.UUID;
 
 import android.bluetooth.BluetoothAdapter;
@@ -55,22 +56,22 @@ import android.util.Log;
  */
 
 /* TODO */
-// available()
+// ** available()
+// ** read()
 // ** connect()
-// disconnect()
-// readChar()
-// readBytes()
+// ** readChar()
+// ** readBytes()
 // readBytesUntil()
 // readString()
 // readStringUntil()
-// buffer()
+// ** buffer()
 // bufferUntil()
-// last()
-// lastChar()
-// list()
-// write()
-// clear()
-// stop()
+// ** last()
+// ** lastChar()
+// ** list()
+// ** write()
+// ** clear()
+// ** stop()
 
 public class SweetBlue implements Runnable {
 
@@ -90,9 +91,11 @@ public class SweetBlue implements Runnable {
 	private OutputStream mOutputStream;
 	private boolean connected = false;
 
-	/**/
+	/* Buffer */
+	private int bufferlength = 128;
 	private int available = 0;
 	private byte[] buffer;
+	private byte[] rawbuffer;
 
 	/* Debug variables */
 	public static boolean DEBUG = false;
@@ -212,6 +215,15 @@ public class SweetBlue implements Runnable {
 	}
 
 	/**
+	 * Returns the available number of bytes in the buffer.
+	 * 
+	 * @return
+	 */
+	public int available() {
+		return available;
+	}
+
+	/**
 	 * 
 	 */
 	private void welcome() {
@@ -230,13 +242,17 @@ public class SweetBlue implements Runnable {
 	@Override
 	public void run() {
 		/* Init the buffer */
-		buffer = new byte[128];
+		buffer = new byte[bufferlength];
+		rawbuffer = new byte[bufferlength];
 
 		while (connected) {
 			// Read from the InputStream
 			try {
 				/* Read the available bytes into the buffer */
-				available = mInputStream.read(buffer);
+				available = mInputStream.read(rawbuffer);
+
+				/* Clone the raw buffer */
+				buffer = rawbuffer.clone();
 
 				Log.i("System.out", "Read " + available + " bytes from device "
 						+ mDevice.getName() + " [" + mDevice.getAddress() + "]");
@@ -247,15 +263,142 @@ public class SweetBlue implements Runnable {
 		}
 	}
 
-	public void write(byte[] b) {
+	/**
+	 * Writes a byte[] buffer to the output stream.
+	 * 
+	 * @param buffer
+	 */
+	public void write(byte[] buffer) {
 		try {
-			mOutputStream.write(b);
+			mOutputStream.write(buffer);
 
-			Log.i("System.out", "Wrote " + b.toString() + " to device "
+			Log.i("System.out", "Wrote " + buffer.toString() + " to device "
 					+ mDevice.getName() + " [" + mDevice.getAddress() + "]");
 		} catch (IOException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
+		}
+	}
+
+	/**
+	 * Returns the first available byte in "buffer" and then removes it.
+	 * 
+	 * @return
+	 */
+	private byte readByte() {
+		/* Get the first byte */
+		byte b = buffer[0];
+
+		/* Remove the read byte from the buffer */
+		if (available > 0) {
+			/* This essentially copies the buffer to itself */
+			System.arraycopy(buffer, 1, buffer, 0, buffer.length - 1);
+
+			/* Decrease the available bytes */
+			available--;
+		} else {
+			/* Clone the raw buffer */
+			buffer = rawbuffer.clone();
+		}
+
+		return (byte) (b & 0xFF);
+	}
+
+	/**
+	 * Returns the next byte in the buffer as an int (0-255);
+	 * 
+	 * @return
+	 */
+	public int read() {
+		return readByte();
+	}
+
+	/**
+	 * Returns the whole byte buffer.
+	 * 
+	 * @return
+	 */
+	public byte[] readBytes() {
+		return buffer;
+	}
+
+	/**
+	 * Returns the available number of bytes in the buffer, and copies the
+	 * buffer contents to the passed byte[]
+	 * 
+	 * @param buffer
+	 * @return
+	 */
+	public int readBytes(byte[] buffer) {
+		buffer = this.buffer.clone();
+		return available;
+	}
+
+	/**
+	 * Returns the next byte in the buffer as a char, if nothing is there it
+	 * returns -1.
+	 * 
+	 * @return
+	 */
+	public char readChar() {
+		return (char) readByte();
+	}
+
+	/**
+	 * Sets the number of bytes to buffer.
+	 * 
+	 * @param bytes
+	 * @return
+	 */
+	public int buffer(int bytes) {
+		bufferlength = bytes;
+
+		buffer = new byte[bytes];
+		rawbuffer = buffer.clone();
+
+		return bytes;
+	}
+
+	/**
+	 * Returns the last byte in the buffer.
+	 * 
+	 * @return
+	 */
+	public int last() {
+		return buffer[buffer.length - 1];
+	}
+
+	/**
+	 * Returns the last byte in the buffer as char.
+	 * 
+	 * @return
+	 */
+	public char lastChar() {
+		return (char) buffer[buffer.length - 1];
+	}
+
+	/**
+	 * Clears the byte buffer.
+	 */
+	public void clear() {
+		buffer = new byte[bufferlength];
+	}
+
+	/**
+	 * Closes the connection on the socket. (What should this return?)
+	 * 
+	 * @return
+	 */
+	public int stop() {
+		try {
+			mSocket.close();
+			/* If it successfully closes I guess we just return a success? */
+			return 0;
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+			/* Otherwise we'll go ahead and say "no, this didn't work well!" */
+			return 1;
 		}
 	}
 }
