@@ -1,4 +1,4 @@
-﻿/**
+/**
  * you can put a one sentence description of your library here.
  *
  * ##copyright##
@@ -25,12 +25,20 @@
 
 package se.onescaleone.sweetblue;
 
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.util.UUID;
+
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
+import android.bluetooth.BluetoothSocket;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.os.Handler;
+import android.os.Looper;
 import android.util.Log;
 
 /**
@@ -64,7 +72,7 @@ import android.util.Log;
 // clear()
 // stop()
 
-public class SweetBlue {
+public class SweetBlue implements Runnable {
 
 	/* PApplet context */
 	private Context ctx;
@@ -73,6 +81,18 @@ public class SweetBlue {
 
 	/* Bluetooth */
 	private BluetoothAdapter mAdapter;
+	private BluetoothDevice mDevice;
+	private UUID uuid = UUID.fromString("00001101-0000-1000-8000-00805F9B34FB");
+
+	/* Socket & streams for BT communication */
+	private BluetoothSocket mSocket;
+	private InputStream mInputStream;
+	private OutputStream mOutputStream;
+	private boolean connected = false;
+
+	/**/
+	private int available = 0;
+	private byte[] buffer;
 
 	/* Debug variables */
 	public static boolean DEBUG = false;
@@ -90,7 +110,12 @@ public class SweetBlue {
 		welcome();
 
 		/* Init the adapter */
-		mAdapter = BluetoothAdapter.getDefaultAdapter();
+		new Handler(Looper.getMainLooper()).post(new Runnable() {
+			@Override
+			public void run() {
+				mAdapter = BluetoothAdapter.getDefaultAdapter();
+			}
+		});
 	}
 
 	/**
@@ -117,7 +142,7 @@ public class SweetBlue {
 				public void onReceive(Context context, Intent intent) {
 					if (intent.getAction().equals(
 							BluetoothAdapter.ACTION_DISCOVERY_STARTED)) {
-						Log.i("Syste.out", "Bluetooth discovery started.");
+						Log.i("System.out", "Bluetooth discovery started.");
 					} else if (intent.getAction().equals(
 							BluetoothAdapter.ACTION_DISCOVERY_FINISHED)) {
 						Log.i("System.out", "Bluetooth discovery finished.");
@@ -146,6 +171,46 @@ public class SweetBlue {
 		}
 	}
 
+	public void connect(String mac) {
+		/* Before we connect, make sure to cancel any discovery! */
+		if (mAdapter.isDiscovering()) {
+			mAdapter.cancelDiscovery();
+
+			Log.i("System.out", "Cancelled ongoing discovery");
+		}
+
+		/* Make sure we're using a real bluetooth address to connect with */
+		if (BluetoothAdapter.checkBluetoothAddress(mac)) {
+			/* Get the remove device we're trying to connect to */
+			mDevice = BluetoothAdapter.getDefaultAdapter().getRemoteDevice(mac);
+
+			/* Create the RFCOMM sockets */
+			try {
+				mSocket = mDevice.createRfcommSocketToServiceRecord(uuid);
+				mSocket.connect();
+
+				/* Set the status */
+				connected = true;
+
+				/* Attach the streams */
+				mInputStream = mSocket.getInputStream();
+				mOutputStream = mSocket.getOutputStream();
+
+				Thread thread = new Thread(this);
+				thread.start();
+
+				Log.i("System.out", "Connected to device " + mDevice.getName()
+						+ " [" + mDevice.getAddress() + "]");
+			} catch (IOException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
+
+		} else {
+			Log.i("System.out", "Addres is not Bluetooth, please verify MAC.");
+		}
+	}
+
 	/**
 	 * 
 	 */
@@ -160,5 +225,37 @@ public class SweetBlue {
 	 */
 	public static String version() {
 		return VERSION;
+	}
+
+	@Override
+	public void run() {
+		/* Init the buffer */
+		buffer = new byte[128];
+
+		while (connected) {
+			// Read from the InputStream
+			try {
+				/* Read the available bytes into the buffer */
+				available = mInputStream.read(buffer);
+
+				Log.i("System.out", "Read " + available + " bytes from device "
+						+ mDevice.getName() + " [" + mDevice.getAddress() + "]");
+			} catch (IOException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
+		}
+	}
+
+	public void write(byte[] b) {
+		try {
+			mOutputStream.write(b);
+
+			Log.i("System.out", "Wrote " + b.toString() + " to device "
+					+ mDevice.getName() + " [" + mDevice.getAddress() + "]");
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
 	}
 }
