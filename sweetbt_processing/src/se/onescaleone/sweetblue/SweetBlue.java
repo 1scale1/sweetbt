@@ -241,6 +241,9 @@ public class SweetBlue implements Runnable {
 
 	@Override
 	public void run() {
+		/* Set the connected state */
+		connected = true;
+		
 		/* Init the buffer */
 		buffer = new byte[bufferlength];
 		rawbuffer = new byte[bufferlength];
