@@ -28,8 +28,9 @@ package se.onescaleone.sweetblue;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.net.Socket;
+import java.util.Set;
 import java.util.UUID;
+import java.util.Vector;
 
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
@@ -122,6 +123,24 @@ public class SweetBlue implements Runnable {
 	}
 
 	/**
+	 * Returns the status of the connection.
+	 * 
+	 * @return
+	 */
+	public boolean isConnected() {
+		return connected;
+	}
+
+	/**
+	 * Returns the list of bonded devices.
+	 * 
+	 * @return
+	 */
+	public String[] list() {
+		return list(false);
+	}
+
+	/**
 	 * This will list all nearby bluetooth devices which have enabled
 	 * "discovery mode".
 	 * 
@@ -130,51 +149,91 @@ public class SweetBlue implements Runnable {
 	 * significantly reduce success rate and speed of both the connect() and
 	 * list() methods.
 	 */
-	public void list() {
-		/* Make sure the adapter is enabled */
-		if (mAdapter.isEnabled()) {
+	public String[] list(boolean discover) {
+		if (discover) {
+			/* Checks for nearby characters */
+			/* Make sure the adapter is enabled */
+			if (mAdapter.isEnabled()) {
 
-			/* Register for intents! */
-			IntentFilter filter = new IntentFilter();
-			filter.addAction(BluetoothAdapter.ACTION_DISCOVERY_STARTED);
-			filter.addAction(BluetoothAdapter.ACTION_DISCOVERY_FINISHED);
-			filter.addAction(BluetoothDevice.ACTION_FOUND);
+				/* Register for intents! */
+				IntentFilter filter = new IntentFilter();
+				filter.addAction(BluetoothAdapter.ACTION_DISCOVERY_STARTED);
+				filter.addAction(BluetoothAdapter.ACTION_DISCOVERY_FINISHED);
+				filter.addAction(BluetoothDevice.ACTION_FOUND);
 
-			BroadcastReceiver receiver = new BroadcastReceiver() {
-				@Override
-				public void onReceive(Context context, Intent intent) {
-					if (intent.getAction().equals(
-							BluetoothAdapter.ACTION_DISCOVERY_STARTED)) {
-						Log.i("System.out", "Bluetooth discovery started.");
-					} else if (intent.getAction().equals(
-							BluetoothAdapter.ACTION_DISCOVERY_FINISHED)) {
-						Log.i("System.out", "Bluetooth discovery finished.");
+				BroadcastReceiver receiver = new BroadcastReceiver() {
+					@Override
+					public void onReceive(Context context, Intent intent) {
+						if (intent.getAction().equals(
+								BluetoothAdapter.ACTION_DISCOVERY_STARTED)) {
+							Log.i("System.out", "Bluetooth discovery started.");
+						} else if (intent.getAction().equals(
+								BluetoothAdapter.ACTION_DISCOVERY_FINISHED)) {
+							Log.i("System.out", "Bluetooth discovery finished.");
 
-						/* Unregister this reciever */
-						ctx.unregisterReceiver(this);
-					} else if (intent.getAction().equals(
-							BluetoothDevice.ACTION_FOUND)) {
-						/* Get the found device! */
-						BluetoothDevice device = intent
-								.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE);
+							/* Unregister this reciever */
+							ctx.unregisterReceiver(this);
+						} else if (intent.getAction().equals(
+								BluetoothDevice.ACTION_FOUND)) {
+							/* Get the found device! */
+							BluetoothDevice device = intent
+									.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE);
 
-						Log.i("System.out", "Device found: " + device.getName()
-								+ " at[ " + device.getAddress() + " ]");
+							Log.i("System.out",
+									"Device found: " + device.getName()
+											+ " at[ " + device.getAddress()
+											+ " ]");
+						}
 					}
-				}
-			};
+				};
 
-			/* Register the receiver for listening to discovery events */
-			ctx.registerReceiver(receiver, filter);
+				/* Register the receiver for listening to discovery events */
+				ctx.registerReceiver(receiver, filter);
 
-			/* Start discovery */
-			mAdapter.startDiscovery();
+				/* Start discovery */
+				mAdapter.startDiscovery();
+
+				return null;
+			} else {
+				Log.i("System.out", "Bluetooth adapter not enabled, aborting!");
+				return null;
+			}
 		} else {
-			Log.i("System.out", "Bluetooth adapter not enabled, aborting!");
+			/* Added Tom's version */
+
+			Vector<String> list = new Vector<String>();
+			Set<BluetoothDevice> devices;
+
+			try {
+				devices = mAdapter.getBondedDevices();
+				// convert the devices 'set' into an array so that we can
+				// perform string functions on it
+				Object[] deviceArray = devices.toArray();
+				// step through it and assign each device in turn to
+				// remoteDevice and then print it's name
+				for (int i = 0; i < devices.size(); i++) {
+					BluetoothDevice thisDevice = mAdapter
+							.getRemoteDevice(deviceArray[i].toString());
+					// print("--bluetooth paired device ["+i+"]: "
+					// + thisDevice.getName()
+					// + " " + thisDevice.getAddress());
+					list.addElement(thisDevice.getAddress());
+				}
+			} catch (UnsatisfiedLinkError e) {
+				// System.err.println("1");
+				// errorMessage("devices", e);
+			} catch (Exception e) {
+				// System.err.println("2");
+				// errorMessage("devices", e);
+			}
+			// System.err.println("move out");
+			String outgoing[] = new String[list.size()];
+			list.copyInto(outgoing);
+			return outgoing;
 		}
 	}
 
-	public void connect(String mac) {
+	public boolean connect(String mac) {
 		/* Before we connect, make sure to cancel any discovery! */
 		if (mAdapter.isDiscovering()) {
 			mAdapter.cancelDiscovery();
@@ -204,13 +263,21 @@ public class SweetBlue implements Runnable {
 
 				Log.i("System.out", "Connected to device " + mDevice.getName()
 						+ " [" + mDevice.getAddress() + "]");
+
+				return true;
 			} catch (IOException e) {
+				connected = false;
 				// TODO Auto-generated catch block
 				e.printStackTrace();
+
+				return false;
 			}
 
 		} else {
+			connected = false;
 			Log.i("System.out", "Addres is not Bluetooth, please verify MAC.");
+
+			return false;
 		}
 	}
 
@@ -243,7 +310,7 @@ public class SweetBlue implements Runnable {
 	public void run() {
 		/* Set the connected state */
 		connected = true;
-		
+
 		/* Init the buffer */
 		buffer = new byte[bufferlength];
 		rawbuffer = new byte[bufferlength];
@@ -338,6 +405,41 @@ public class SweetBlue implements Runnable {
 	}
 
 	/**
+	 * Returns a bytebuffer until the byte b. If the byte b doesn't exist in the
+	 * current buffer, null is returned.
+	 * 
+	 * @param b
+	 * @return
+	 */
+	public byte[] readBytesUntil(byte b) {
+		/* Read the buffer until the value 'b' is found */
+		for (int i = 0; i < buffer.length; i++) {
+			if (buffer[i] == b) {
+				/* Found the byte, buffer until this index, and return */
+				byte[] returnbuffer = new byte[i];
+				/* Populate the returnbuffer */
+				for (int j = 0; j < returnbuffer.length; j++) {
+					returnbuffer[j] = buffer[j];
+				}
+
+				/* Return buffer */
+				return returnbuffer;
+			}
+		}
+		return null;
+	}
+
+	/**
+	 * TODO
+	 * 
+	 * @param b
+	 * @param buffer
+	 */
+	public void readBytesUntil(byte b, byte[] buffer) {
+		Log.i("System.out", "Will do a.s.a.p.");
+	}
+
+	/**
 	 * Returns the next byte in the buffer as a char, if nothing is there it
 	 * returns -1.
 	 * 
@@ -345,6 +447,39 @@ public class SweetBlue implements Runnable {
 	 */
 	public char readChar() {
 		return (char) readByte();
+	}
+
+	/**
+	 * Returns the buffer as a string.
+	 * 
+	 * @return
+	 */
+	public String readString() {
+		String returnstring = null;
+
+		for (int i = 0; i < buffer.length; i++)
+			returnstring += (char) buffer[i];
+
+		return returnstring;
+	}
+
+	/**
+	 * Returns the buffer as string until character c.
+	 * 
+	 * @param c
+	 * @return
+	 */
+	public String readStringUntil(char c) {
+		/* Get the buffer as string */
+		String stringbuffer = readString();
+
+		int index;
+		/* Make sure that the character exists in the string */
+		if ((index = stringbuffer.indexOf(c)) > 0) {
+			return stringbuffer.substring(0, index);
+		} else {
+			return null;
+		}
 	}
 
 	/**
@@ -388,13 +523,27 @@ public class SweetBlue implements Runnable {
 	}
 
 	/**
+	 * Disconnects the bluetooth socket.
+	 * 
+	 * (just runs stop() for now)
+	 */
+	public void disconnect() {
+		stop();
+	}
+
+	/**
 	 * Closes the connection on the socket. (What should this return?)
 	 * 
 	 * @return
 	 */
 	public int stop() {
 		try {
+			/* Close the socket */
 			mSocket.close();
+
+			/* Set the connected state */
+			connected = false;
+
 			/* If it successfully closes I guess we just return a success? */
 			return 0;
 		} catch (IOException e) {
