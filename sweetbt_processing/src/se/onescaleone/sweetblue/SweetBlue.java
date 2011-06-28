@@ -73,6 +73,7 @@ import android.util.Log;
 // ** write()
 // ** clear()
 // ** stop()
+// sweetBlueEvent()
 
 public class SweetBlue implements Runnable {
 
@@ -166,10 +167,10 @@ public class SweetBlue implements Runnable {
 					public void onReceive(Context context, Intent intent) {
 						if (intent.getAction().equals(
 								BluetoothAdapter.ACTION_DISCOVERY_STARTED)) {
-							Log.i("System.out", "Bluetooth discovery started.");
+							if (DEBUG) Log.i("System.out", "Bluetooth discovery started.");
 						} else if (intent.getAction().equals(
 								BluetoothAdapter.ACTION_DISCOVERY_FINISHED)) {
-							Log.i("System.out", "Bluetooth discovery finished.");
+							if (DEBUG) Log.i("System.out", "Bluetooth discovery finished.");
 
 							/* Unregister this reciever */
 							ctx.unregisterReceiver(this);
@@ -179,7 +180,7 @@ public class SweetBlue implements Runnable {
 							BluetoothDevice device = intent
 									.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE);
 
-							Log.i("System.out",
+							if (DEBUG) Log.i("System.out",
 									"Device found: " + device.getName()
 											+ " at[ " + device.getAddress()
 											+ " ]");
@@ -195,7 +196,7 @@ public class SweetBlue implements Runnable {
 
 				return null;
 			} else {
-				Log.i("System.out", "Bluetooth adapter not enabled, aborting!");
+				if (DEBUG) Log.i("System.out", "Bluetooth adapter not enabled, aborting!");
 				return null;
 			}
 		} else {
@@ -214,38 +215,38 @@ public class SweetBlue implements Runnable {
 				for (int i = 0; i < devices.size(); i++) {
 					BluetoothDevice thisDevice = mAdapter
 							.getRemoteDevice(deviceArray[i].toString());
-					// print("--bluetooth paired device ["+i+"]: "
-					// + thisDevice.getName()
-					// + " " + thisDevice.getAddress());
 					list.addElement(thisDevice.getAddress());
 				}
 			} catch (UnsatisfiedLinkError e) {
-				// System.err.println("1");
 				// errorMessage("devices", e);
 			} catch (Exception e) {
-				// System.err.println("2");
 				// errorMessage("devices", e);
 			}
-			// System.err.println("move out");
 			String outgoing[] = new String[list.size()];
 			list.copyInto(outgoing);
 			return outgoing;
 		}
 	}
 
-	public boolean connect(String mac) {
+	
+	public String getName() {
+		if (mDevice !=null) return mDevice.getName();
+		else return "no device connected";
+	}
+
+	
+	public synchronized boolean connect(String mac) {
 		/* Before we connect, make sure to cancel any discovery! */
 		if (mAdapter.isDiscovering()) {
 			mAdapter.cancelDiscovery();
 
-			Log.i("System.out", "Cancelled ongoing discovery");
+			if (DEBUG) Log.i("System.out", "Cancelled ongoing discovery");
 		}
 
 		/* Make sure we're using a real bluetooth address to connect with */
 		if (BluetoothAdapter.checkBluetoothAddress(mac)) {
-			/* Get the remove device we're trying to connect to */
+			/* Get the remote device we're trying to connect to */
 			mDevice = BluetoothAdapter.getDefaultAdapter().getRemoteDevice(mac);
-
 			/* Create the RFCOMM sockets */
 			try {
 				mSocket = mDevice.createRfcommSocketToServiceRecord(uuid);
@@ -258,10 +259,13 @@ public class SweetBlue implements Runnable {
 				mInputStream = mSocket.getInputStream();
 				mOutputStream = mSocket.getOutputStream();
 
+				/* ???? If this Thread is started locally, doesn't
+					it go out of scope when the method returns ????
+				*/
 				Thread thread = new Thread(this);
 				thread.start();
 
-				Log.i("System.out", "Connected to device " + mDevice.getName()
+				if (DEBUG) Log.i("System.out", "Connected to device " + mDevice.getName()
 						+ " [" + mDevice.getAddress() + "]");
 
 				return true;
@@ -275,7 +279,7 @@ public class SweetBlue implements Runnable {
 
 		} else {
 			connected = false;
-			Log.i("System.out", "Addres is not Bluetooth, please verify MAC.");
+			if (DEBUG) Log.i("System.out", "Addres is not Bluetooth, please verify MAC.");
 
 			return false;
 		}
@@ -324,7 +328,7 @@ public class SweetBlue implements Runnable {
 				/* Clone the raw buffer */
 				buffer = rawbuffer.clone();
 
-				Log.i("System.out", "Read " + available + " bytes from device "
+				if (DEBUG) Log.i("System.out", "Read " + available + " bytes from device "
 						+ mDevice.getName() + " [" + mDevice.getAddress() + "]");
 			} catch (IOException e) {
 				// TODO Auto-generated catch block
@@ -342,7 +346,7 @@ public class SweetBlue implements Runnable {
 		try {
 			mOutputStream.write(buffer);
 
-			Log.i("System.out", "Wrote " + buffer.toString() + " to device "
+			if (DEBUG) Log.i("System.out", "Wrote " + buffer.toString() + " to device "
 					+ mDevice.getName() + " [" + mDevice.getAddress() + "]");
 		} catch (IOException e) {
 			// TODO Auto-generated catch block
@@ -436,7 +440,7 @@ public class SweetBlue implements Runnable {
 	 * @param buffer
 	 */
 	public void readBytesUntil(byte b, byte[] buffer) {
-		Log.i("System.out", "Will do a.s.a.p.");
+		if (DEBUG) Log.i("System.out", "Will do a.s.a.p.");
 	}
 
 	/**
@@ -536,21 +540,21 @@ public class SweetBlue implements Runnable {
 	 * 
 	 * @return
 	 */
-	public int stop() {
+	public void stop() {
 		try {
 			/* Close the socket */
 			mSocket.close();
 
 			/* Set the connected state */
 			connected = false;
-
 			/* If it successfully closes I guess we just return a success? */
-			return 0;
+			//return 0;
 		} catch (IOException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 			/* Otherwise we'll go ahead and say "no, this didn't work well!" */
-			return 1;
+			//return 1;
 		}
 	}
 }
+
