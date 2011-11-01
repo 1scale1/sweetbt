@@ -26,7 +26,7 @@
 package se.onescaleone.sweetblue;
 
 /*
- *  Written by Andreas Göransson & David Cuartielles, 1scale1 Handelsbolag, 
+ *  Written by Andreas Goransson & David Cuartielles, 1scale1 Handelsbolag, 
  *  for use in the project SweetBlue.
  *  
  *  SweetBlue: a library and communication protocol used to set Arduino 
@@ -76,7 +76,7 @@ public class SweetBlue {
 
 	// myParent is a reference to the parent sketch
 	PApplet myParent;
-//test
+	// test
 	public final static String VERSION = "##version##";
 
 	/* Contains threads to control the communication */
@@ -91,7 +91,7 @@ public class SweetBlue {
 	public static final int STATE_CONNECTED = 18;
 	public static final int STATE_DISCONNECTED = 28;
 	public static final int STATE_CONNECTING = 38;
-	
+
 	/* Link to the applications main handler */
 	private Handler mainHandler;
 	private Handler recieveHandler;
@@ -132,27 +132,25 @@ public class SweetBlue {
 		welcome();
 		/* Init hashmap, has only 16 spaces now though */
 		values = new HashMap<Integer, Integer>();
-		
+
 		/*
-		 * Add the listener to the parent, this should force the sketch to
-		 * implement the method...
+		 * Add the listener to the parent, this should force the sketch to implement
+		 * the method...
 		 */
-		/*try {
-			Method m = myParent.getClass().getMethod("SweetBlueConnected", new Class[] { SweetBlueEvent.class });
-			this.addSweetBlueListener(new GenericListener(this, m));
-		} catch (SecurityException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		} catch (NoSuchMethodException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		}*/
+		/*
+		 * try { Method m = myParent.getClass().getMethod("SweetBlueConnected", new
+		 * Class[] { SweetBlueEvent.class }); this.addSweetBlueListener(new
+		 * GenericListener(this, m)); } catch (SecurityException e) { // TODO
+		 * Auto-generated catch block e.printStackTrace(); } catch
+		 * (NoSuchMethodException e) { // TODO Auto-generated catch block
+		 * e.printStackTrace(); }
+		 */
 
 	}
 
 	/**
-	 * Set all your pinmodes in this function inside Processing. The library
-	 * will call this automatically.
+	 * Set all your pinmodes in this function inside Processing. The library will
+	 * call this automatically.
 	 */
 	public void callPinModes() {
 		if (SweetBlue.DEBUG)
@@ -192,22 +190,26 @@ public class SweetBlue {
 									switch (msg.arg1) {
 									case BluetoothChatService.STATE_CONNECTED:
 										/* Dispatch the connected event */
-										//dispatchConnectedEvent(new SweetBlueEvent(SweetBlue.this, true));
+										// dispatchConnectedEvent(new SweetBlueEvent(SweetBlue.this,
+										// true));
 										state = STATE_CONNECTED;
 										break;
 									case BluetoothChatService.STATE_CONNECTING:
 										/* Dispatch the connected event */
-										//dispatchConnectedEvent(new SweetBlueEvent(SweetBlue.this, false));
+										// dispatchConnectedEvent(new SweetBlueEvent(SweetBlue.this,
+										// false));
 										state = STATE_CONNECTING;
 										break;
 									case BluetoothChatService.STATE_LISTEN:
 										/* Dispatch the connected event */
-										//dispatchConnectedEvent(new SweetBlueEvent(SweetBlue.this, false));
+										// dispatchConnectedEvent(new SweetBlueEvent(SweetBlue.this,
+										// false));
 										state = STATE_CONNECTING;
 										break;
 									case BluetoothChatService.STATE_NONE:
 										/* Dispatch the connected event */
-										//dispatchConnectedEvent(new SweetBlueEvent(SweetBlue.this, false));
+										// dispatchConnectedEvent(new SweetBlueEvent(SweetBlue.this,
+										// false));
 										state = STATE_DISCONNECTED;
 										break;
 									}
@@ -256,12 +258,27 @@ public class SweetBlue {
 		}
 	}
 
+	/**
+	 * Checks the connection status of the chatservice.
+	 * 
+	 * @return
+	 */
 	public boolean isConnected() {
 		if (mChatService != null
 				&& mChatService.getState() == BluetoothChatService.STATE_CONNECTED)
 			return true;
 		else
 			return false;
+	}
+
+	/**
+	 * Just checks if the chatservice (BluetoothChatService) is running or not
+	 * (null?).
+	 * 
+	 * @return
+	 */
+	public boolean isBtOn() {
+		return (mChatService != null);
 	}
 
 	private void welcome() {
@@ -297,8 +314,7 @@ public class SweetBlue {
 	}
 
 	/**
-	 * Used to determine if we're sending data or not... don't use this
-	 * yourself!
+	 * Used to determine if we're sending data or not... don't use this yourself!
 	 * 
 	 * @return
 	 */
@@ -336,9 +352,9 @@ public class SweetBlue {
 	 * bluetooth communication and reset and shouldn't be used!
 	 * 
 	 * @param pin
-	 *            number on the ArduinoBT
+	 *          number on the ArduinoBT
 	 * @param mode
-	 *            OUTPUT or INPUT
+	 *          OUTPUT or INPUT
 	 * @return null (if fail) or the sent byte[]
 	 */
 	public byte[] pinMode(final int pin, int mode) {
@@ -358,9 +374,9 @@ public class SweetBlue {
 	 * example: ditialWrite( 2, SweetBlue.HIGH );
 	 * 
 	 * @param pin
-	 *            number on the ArduinoBT
+	 *          number on the ArduinoBT
 	 * @param value
-	 *            HIGH or LOW
+	 *          HIGH or LOW
 	 */
 	public void digitalWrite(final int pin, int value) {
 		mChatService.write(assemblePackage((byte) pin, (byte) 0x03, (byte) value));
@@ -387,13 +403,14 @@ public class SweetBlue {
 	 * example: analogWrite( 2, 127 );
 	 * 
 	 * @param pin
-	 *            number on the ArduinoBT
+	 *          number on the ArduinoBT
 	 * @param value
-	 *            0 - 255
+	 *          0 - 255
 	 */
 	public void analogWrite(final int pin, int value) {
 		if (value >= 0 && value <= 255)
-			mChatService.write(assemblePackage((byte) pin, (byte) 0x05, (byte) value));
+			mChatService
+					.write(assemblePackage((byte) pin, (byte) 0x05, (byte) value));
 		else
 			Log.i("System.out", SweetBlue.DEBUGTAG + "Bad value on analogWrite!");
 	}
@@ -406,9 +423,9 @@ public class SweetBlue {
 	 * initially...
 	 * 
 	 * @param pin
-	 *            The pin number to read
+	 *          The pin number to read
 	 * @param variable
-	 *            variable to which the reading should be written.
+	 *          variable to which the reading should be written.
 	 */
 	public void analogRead(int pin, int[] variable) {
 		mChatService.write(assemblePackage((byte) pin, (byte) 0x04, (byte) 0x00));
@@ -420,9 +437,8 @@ public class SweetBlue {
 	}
 
 	/**
-	 * Sends the close command to Arduino, so it knows to reset the
-	 * BluetoothChip. This should allways be called in the "onStop" method in
-	 * the sketch.
+	 * Sends the close command to Arduino, so it knows to reset the BluetoothChip.
+	 * This should allways be called in the "onStop" method in the sketch.
 	 */
 	public void close() {
 		if (SweetBlue.DEBUG)
@@ -499,9 +515,8 @@ public class SweetBlue {
 	 * 
 	 * @param in
 	 * @return
-	 * @deprecated This function is used for the Sweet tool, the library uses
-	 *             the newer "firmata" like function to communicate with
-	 *             ArduinoBT.
+	 * @deprecated This function is used for the Sweet tool, the library uses the
+	 *             newer "firmata" like function to communicate with ArduinoBT.
 	 */
 	@Deprecated
 	private byte[] attachHeaderBytes(byte[] in) {
